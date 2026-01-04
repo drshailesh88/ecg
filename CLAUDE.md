@@ -116,6 +116,59 @@ Tier 4: Practicing Cardiologists & Electrophysiologists
 - Dora integration for guideline references
 - Export to clinical documentation
 
+## Critical AI Architecture Decision
+
+**RESEARCH FINDING**: General vision LLMs (GPT-4o, Gemini, Claude) achieve only **30-66% accuracy** on ECG diagnosis. Specialized ECG AI achieves **97%+**. We cannot rely on general vision LLMs.
+
+### Our Hybrid Approach: Code + Specialized AI + LLM
+
+```
+Layer 1: Image Processing (Specialized, NOT General LLM)
+├── OpenCV + Custom CNN for lead detection
+├── Signal processing for waveform digitization
+└── Pixel-level accuracy required
+
+Layer 2: Diagnosis (Programmatic Algorithms in Code)
+├── VT vs SVT: Brugada, Vereckei, Basel, Pava (coded)
+├── STEMI: Fiol's algorithm, RCA/LCx differentiation (coded)
+├── Pathway: SMART-WPW, Arruda (coded)
+└── Measurements: Digital caliper on extracted signal
+
+Layer 3: Reasoning (LLM + RAG)
+├── Input: Algorithm results (not raw image)
+├── Knowledge: RAG from textbooks, guidelines, cases
+├── Output: Explanation, teaching, conversation
+└── Model: Qwen 2.5 via Ollama (local)
+```
+
+## Validated Algorithms to Implement
+
+### VT vs SVT (Wide Complex Tachycardia)
+| Algorithm | Accuracy | Year | Implementation |
+|-----------|----------|------|----------------|
+| **Brugada** | 89% sens | 1991 | 4-step precordial |
+| **Vereckei** | 69-94% | 2008 | aVR single-lead |
+| **Basel** | 91-93% | 2022 | Fastest, 3 criteria |
+| **Pava** | 85%+ | 2010 | Lead II R-peak time |
+
+### Accessory Pathway Localization
+| Algorithm | Accuracy | Priority |
+|-----------|----------|----------|
+| **SMART-WPW** | 97% | Primary (2025, best) |
+| **EASY-WPW** | 94% | Secondary (2023) |
+| **Arruda** | 53-75% | Reference (classic) |
+
+### STEMI Localization
+- Anterior (LAD): V1-V4
+- Inferior (RCA/LCx): II, III, aVF + differentiation algorithms
+- Lateral (LCx): I, aVL, V5-V6
+- RCA vs LCx: "III-II-I+aVF+V1" algorithm (86% accuracy)
+
+### SVT Classification
+- RP interval analysis (<70ms = AVNRT, >70ms = AVRT/AT)
+- P-wave morphology for AT localization
+- Machine learning for mechanism (91.7% AVNRT, 78.4% AVRT sensitivity)
+
 ## Technical Architecture
 
 ```
@@ -128,23 +181,23 @@ Tier 4: Practicing Cardiologists & Electrophysiologists
 │  ├── Analysis Dashboard                                     │
 │  └── Learning Module                                        │
 ├─────────────────────────────────────────────────────────────┤
-│  Core Engine                                                │
+│  Core Engine (Programmatic - NOT LLM)                       │
 │  ├── Image Preprocessing (OpenCV/PIL)                       │
-│  ├── Lead Detection & Extraction                            │
-│  ├── Waveform Digitization                                  │
-│  └── Signal Analysis                                        │
+│  ├── Lead Detection (Custom CNN)                            │
+│  ├── Waveform Digitization (Signal Processing)              │
+│  ├── Interval Measurement (Digital Caliper)                 │
+│  └── Algorithm Engine (Brugada, Basel, SMART-WPW, etc.)    │
 ├─────────────────────────────────────────────────────────────┤
-│  AI Layer                                                   │
-│  ├── Vision Model (ECG image understanding)                 │
-│  ├── Language Model (Ollama/Qwen for chat)                  │
-│  ├── Specialized ECG Models (fine-tuned)                    │
-│  └── RAG Pipeline (clinical knowledge)                      │
+│  AI Layer (LLM for Reasoning Only)                          │
+│  ├── Qwen 2.5 via Ollama (reasoning, explanation)          │
+│  ├── RAG Pipeline (clinical knowledge)                      │
+│  └── NOT used for primary diagnosis                         │
 ├─────────────────────────────────────────────────────────────┤
-│  Knowledge Base                                             │
-│  ├── ECG interpretation guidelines                          │
-│  ├── Arrhythmia algorithms (Brugada, Vereckei, etc.)       │
-│  ├── Pathway localization tables                            │
-│  └── Drug/electrolyte effect references                     │
+│  Knowledge Base (ChromaDB)                                  │
+│  ├── Textbooks: Marriott, Chou, ECGs Made Easy             │
+│  ├── Guidelines: ACC/AHA, ESC SVT 2019, ESC VA 2022        │
+│  ├── Algorithms: Machine-readable definitions               │
+│  └── Cases: PTB-XL (21,837), curated teaching cases        │
 ├─────────────────────────────────────────────────────────────┤
 │  Integration Layer                                          │
 │  ├── EMR Connector                                          │
@@ -152,6 +205,24 @@ Tier 4: Practicing Cardiologists & Electrophysiologists
 │  └── Export Services                                        │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+## Vision Model Strategy
+
+**DO NOT use general vision LLMs (GPT-4V, Claude, Gemini) for diagnosis.**
+
+| Task | Approach | Why |
+|------|----------|-----|
+| Lead Detection | Custom CNN + OpenCV | Pixel-level accuracy needed |
+| Measurements | Signal processing | LLMs hallucinate numbers |
+| Pattern Classification | Fine-tuned on PTB-XL | Need specialized training |
+| Diagnosis | Coded algorithms | Validated, reproducible |
+| Explanation | Qwen + RAG | LLMs excel here |
+
+### Training Data Sources
+- **PTB-XL**: 21,837 ECGs with multi-label diagnoses
+- **PhysioNet MIT-BIH**: Arrhythmia annotations
+- **Chapman-Shaoxing**: 10,646 ECGs, 11 rhythms
+- **Custom**: EP-correlated pathway cases (partner with EP labs)
 
 ## Development Philosophy: Launch to Win
 
@@ -176,11 +247,13 @@ Delete "minimum viable" from your vocabulary. We're building the app that:
 
 Before launch, ALL must be true:
 - [ ] STEMI detection: 99%+ sensitivity (lives depend on this)
-- [ ] VT vs SVT: Brugada, Vereckei, Pava algorithms implemented
-- [ ] WPW pathway localization: Arruda + Taguchi minimum
+- [ ] STEMI localization: Anterior/Inferior/Lateral/Posterior with culprit vessel (LAD/RCA/LCx)
+- [ ] VT vs SVT: Brugada, Vereckei, Basel, Pava algorithms (ensemble)
+- [ ] SVT classification: AVNRT vs AVRT vs AT with RP interval analysis
+- [ ] WPW pathway localization: SMART-WPW (97%) + EASY-WPW + Arruda
 - [ ] Photo to analysis: <7 seconds on mid-range phone
 - [ ] 50+ curated teaching cases with interactive walkthrough
-- [ ] Works completely offline
+- [ ] Works completely offline (specialized models, not cloud LLMs)
 - [ ] Tested with 500+ real ECGs, reviewed by 3+ cardiologists
 - [ ] 4.5+ star rating in beta feedback
 
