@@ -5,7 +5,7 @@ Components:
 - textbook_processor: Extract content from PDF textbooks
 - litfl_scraper: Harvest content from LITFL ECG Library
 - embedder: Embed content into ChromaDB for RAG
-- rag_pipeline: Query knowledge for reasoning
+- advanced_rag: State-of-the-art RAG with hybrid retrieval
 """
 
 from .textbook_processor import (
@@ -29,6 +29,22 @@ from .embedder import (
     EmbeddingStats,
 )
 
+from .advanced_rag import (
+    # Core classes
+    AdvancedRAGPipeline,
+    ECGKnowledgeRAG,
+    RetrievedDocument,
+    # Embedding models
+    PubMedBERTEmbeddings,
+    OllamaEmbeddings,
+    # Retrieval components
+    BM25Index,
+    CrossEncoderReranker,
+    QueryEnhancer,
+    # Utilities
+    reciprocal_rank_fusion,
+)
+
 __all__ = [
     # Textbook processing
     "PodridProcessor",
@@ -42,7 +58,17 @@ __all__ = [
     "LITFLScraper",
     "LITFLPage",
     "LITFLCase",
-    # Embedding
+    # Basic Embedding
     "ECGKnowledgeEmbedder",
     "EmbeddingStats",
+    # Advanced RAG (recommended)
+    "AdvancedRAGPipeline",
+    "ECGKnowledgeRAG",
+    "RetrievedDocument",
+    "PubMedBERTEmbeddings",
+    "OllamaEmbeddings",
+    "BM25Index",
+    "CrossEncoderReranker",
+    "QueryEnhancer",
+    "reciprocal_rank_fusion",
 ]

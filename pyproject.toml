@@ -27,6 +27,12 @@ dependencies = [
     "numpy>=1.24.0",
     "pydantic>=2.0.0",
     "httpx>=0.25.0",
+    # Advanced RAG dependencies
+    "sentence-transformers>=2.2.0",  # PubMedBERT embeddings & cross-encoder reranking
+    "rank-bm25>=0.2.2",  # BM25 sparse retrieval for hybrid search
+    # PDF processing for textbook extraction
+    "pymupdf>=1.23.0",  # PyMuPDF for PDF parsing
+    "beautifulsoup4>=4.12.0",  # HTML parsing for LITFL scraper
 ]
 
 [project.optional-dependencies]
