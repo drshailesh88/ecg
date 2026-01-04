@@ -1,0 +1,242 @@
+[
+  {
+    "name": "Brugada Algorithm",
+    "purpose": "Differentiate VT from SVT with aberrancy in wide complex tachycardia",
+    "year": 1991,
+    "accuracy": "89% sensitivity, varies in external validation",
+    "citation": "Brugada P, et al. Circulation 1991;83:1649-59",
+    "full_explanation": "The Brugada algorithm is a stepwise approach to differentiating ventricular tachycardia (VT) from supraventricular tachycardia (SVT) with aberrant conduction. It examines the precordial leads V1-V6 for specific morphological features. If any step is positive, the diagnosis is VT. The algorithm has high sensitivity but moderate specificity in clinical practice.",
+    "steps": [
+      {
+        "number": 1,
+        "criterion": "Absence of RS complex in ALL precordial leads (V1-V6)",
+        "explanation": "Look at leads V1 through V6. If there is no RS complex (only R, only S, or only QS patterns) in ANY precordial lead, the diagnosis is VT. This indicates the ventricle is depolarizing in an abnormal direction.",
+        "if_yes": "VT",
+        "if_no": "Proceed to Step 2"
+      },
+      {
+        "number": 2,
+        "criterion": "RS interval > 100ms in ANY precordial lead",
+        "explanation": "Measure from the onset of R wave to the nadir (deepest point) of the S wave. If this interval exceeds 100ms in any V lead, it suggests slow ventricular conduction consistent with VT.",
+        "if_yes": "VT",
+        "if_no": "Proceed to Step 3"
+      },
+      {
+        "number": 3,
+        "criterion": "AV dissociation present",
+        "explanation": "Look for P waves that march through independently of QRS complexes. Also look for fusion beats (hybrid of sinus and VT) or capture beats (narrow normal beat during wide complex rhythm). AV dissociation is virtually diagnostic of VT.",
+        "if_yes": "VT",
+        "if_no": "Proceed to Step 4"
+      },
+      {
+        "number": 4,
+        "criterion": "Morphology criteria for VT in V1/V2 and V6",
+        "explanation": "For RBBB morphology (dominant R in V1): VT if V1 shows monophasic R, qR, or RS with R>S; VT if V6 shows QS or rS pattern. For LBBB morphology (dominant S in V1): VT if V1/V2 shows initial R>30ms, slurred S downstroke, or RS interval >60ms; VT if V6 shows QR or QS pattern.",
+        "if_yes": "VT",
+        "if_no": "SVT with aberrancy"
+      }
+    ]
+  },
+  {
+    "name": "Vereckei aVR Algorithm",
+    "purpose": "Differentiate VT from SVT using only lead aVR",
+    "year": 2008,
+    "accuracy": "69-94% depending on study",
+    "citation": "Vereckei A, et al. Heart Rhythm 2008;5:89-98",
+    "full_explanation": "The Vereckei algorithm uses only lead aVR to differentiate VT from SVT with aberrancy. This single-lead approach is faster than examining multiple leads. The algorithm looks at the initial deflection and morphological features in aVR.",
+    "steps": [
+      {
+        "number": 1,
+        "criterion": "Initial dominant R wave in aVR",
+        "explanation": "If the initial deflection in aVR is a dominant R wave (R > S or R alone), this indicates the initial ventricular activation is directed toward aVR, which is abnormal and suggests VT.",
+        "if_yes": "VT",
+        "if_no": "Proceed to Step 2"
+      },
+      {
+        "number": 2,
+        "criterion": "Initial r or q wave > 40ms in aVR",
+        "explanation": "Measure the width of the initial small r wave (in RS or rS pattern) or initial q wave (in qR pattern). If either exceeds 40ms, it indicates slow initial ventricular activation consistent with VT.",
+        "if_yes": "VT",
+        "if_no": "Proceed to Step 3"
+      },
+      {
+        "number": 3,
+        "criterion": "Notching on initial downstroke of predominantly negative QRS",
+        "explanation": "In a predominantly negative QRS in aVR (rS, QS, or qRS), look for notching on the initial downstroke. This notch represents slow, discontinuous ventricular activation typical of VT.",
+        "if_yes": "VT",
+        "if_no": "Proceed to Step 4"
+      },
+      {
+        "number": 4,
+        "criterion": "Vi/Vt ratio ≤ 1",
+        "explanation": "Measure voltage at 40ms from QRS onset (Vi) and voltage at 40ms before QRS end (Vt). If Vi/Vt ≤ 1, initial activation is slower than terminal, suggesting VT. If Vi/Vt > 1, suggests SVT.",
+        "if_yes": "VT",
+        "if_no": "SVT with aberrancy"
+      }
+    ]
+  },
+  {
+    "name": "Basel Algorithm",
+    "purpose": "Rapid differentiation of VT from SVT in wide complex tachycardia",
+    "year": 2022,
+    "accuracy": "91-93% accuracy, fastest to apply (median 36 seconds)",
+    "citation": "JACC Clin Electrophysiol 2022",
+    "full_explanation": "The Basel algorithm is the newest and fastest approach to WCT differentiation. It uses only 3 simple criteria that can be assessed in seconds. VT is diagnosed if 2 or more criteria are present. It integrates clinical context with ECG findings.",
+    "steps": [
+      {
+        "number": 1,
+        "criterion": "Clinical high-risk features present",
+        "explanation": "Age > 55 years OR known structural heart disease (prior MI, heart failure, cardiomyopathy). These clinical features significantly increase the prior probability of VT.",
+        "if_yes": "+1 point",
+        "if_no": "0 points"
+      },
+      {
+        "number": 2,
+        "criterion": "Lead II: Time to first peak > 40ms",
+        "explanation": "In lead II, measure from QRS onset to the first peak (whether positive or negative). If this time exceeds 40ms, it indicates slow initial ventricular activation.",
+        "if_yes": "+1 point",
+        "if_no": "0 points"
+      },
+      {
+        "number": 3,
+        "criterion": "Lead aVR: Time to first peak > 40ms",
+        "explanation": "Same measurement in lead aVR. Time from QRS onset to first peak > 40ms indicates abnormal initial activation direction.",
+        "if_yes": "+1 point",
+        "if_no": "0 points"
+      }
+    ],
+    "interpretation": "≥2 points = VT, <2 points = SVT with aberrancy"
+  },
+  {
+    "name": "Pava Algorithm (Lead II R-wave Peak Time)",
+    "purpose": "Simple single-measurement VT vs SVT differentiation",
+    "year": 2010,
+    "accuracy": "85%+ accuracy",
+    "citation": "Pava LF, et al. Heart Rhythm 2010",
+    "full_explanation": "The Pava algorithm uses a single measurement: the R-wave peak time in lead II. This is the time from QRS onset to the peak of the R wave. It's one of the simplest criteria to apply.",
+    "steps": [
+      {
+        "number": 1,
+        "criterion": "Measure R-wave peak time in lead II",
+        "explanation": "Find lead II. Measure from the very beginning of the QRS complex to the peak of the R wave (highest point of the positive deflection). Use calipers for accuracy.",
+        "if_yes": "Proceed to interpretation",
+        "if_no": "N/A"
+      },
+      {
+        "number": 2,
+        "criterion": "R-wave peak time ≥ 50ms",
+        "explanation": "If the R-wave peak time is 50ms or greater, this indicates VT. In SVT with aberrancy, the peak time is typically < 50ms because conduction uses the His-Purkinje system.",
+        "if_yes": "VT",
+        "if_no": "SVT with aberrancy"
+      }
+    ]
+  },
+  {
+    "name": "SMART-WPW Algorithm",
+    "purpose": "Localize accessory pathway in Wolff-Parkinson-White syndrome",
+    "year": 2025,
+    "accuracy": "97% accuracy",
+    "citation": "Heart Rhythm 2025",
+    "full_explanation": "The SMART-WPW algorithm is the most accurate currently available pathway localization algorithm. It uses delta wave polarity, QRS morphology, and precordial transition to localize manifest accessory pathways to specific anatomical locations.",
+    "steps": [
+      {
+        "number": 1,
+        "criterion": "Assess delta wave polarity in multiple leads",
+        "explanation": "Examine the initial 40ms of QRS (delta wave) in leads I, II, III, aVL, aVF, and V1-V6. Note if positive (+), negative (-), or isoelectric (0) in each lead."
+      },
+      {
+        "number": 2,
+        "criterion": "Determine left vs right sided pathway",
+        "explanation": "Positive delta in V1 suggests left-sided pathway. Negative delta in V1 suggests right-sided or septal pathway."
+      },
+      {
+        "number": 3,
+        "criterion": "Determine anterior vs posterior location",
+        "explanation": "Positive delta in inferior leads (II, III, aVF) suggests anterior pathway. Negative delta in inferior leads suggests posterior pathway."
+      },
+      {
+        "number": 4,
+        "criterion": "Determine free wall vs septal",
+        "explanation": "Delta wave polarity in leads I and aVL helps distinguish free wall from septal pathways."
+      }
+    ],
+    "locations": [
+      "Left Lateral (LL)",
+      "Left Posterolateral (LPL)",
+      "Left Posterior (LP)",
+      "Posteroseptal (PS)",
+      "Right Posteroseptal (RPS)",
+      "Right Posterior (RP)",
+      "Right Lateral (RL)",
+      "Right Anterolateral (RAL)",
+      "Anteroseptal (AS)",
+      "Midseptal (MS)"
+    ]
+  },
+  {
+    "name": "RP Interval SVT Classification",
+    "purpose": "Classify SVT mechanism based on RP interval",
+    "year": "Classic",
+    "accuracy": "Varies, best as first-pass classification",
+    "citation": "Standard electrophysiology teaching",
+    "full_explanation": "The relationship between the RP interval (from QRS to next P wave) and PR interval (from P wave to next QRS) helps classify SVT mechanisms. This is fundamental to understanding SVT.",
+    "steps": [
+      {
+        "number": 1,
+        "criterion": "Identify P waves during tachycardia",
+        "explanation": "Look carefully for P waves. They may be hidden in QRS, ST segment, or T wave. Compare to baseline ECG if available. Check V1 for pseudo-R' wave (hidden P in AVNRT)."
+      },
+      {
+        "number": 2,
+        "criterion": "Measure RP interval",
+        "explanation": "Measure from the end of QRS to the next P wave. Short RP < 70ms. Long RP > PR interval."
+      },
+      {
+        "number": 3,
+        "criterion": "Classify based on RP interval",
+        "explanation": "Short RP (< 70ms or P in QRS): Typical AVNRT most likely. RP 70-90ms: Could be AVNRT or AVRT. RP > 90ms but < PR: Orthodromic AVRT likely. RP > PR (Long RP): Atypical AVNRT, Atrial Tachycardia, or PJRT."
+      }
+    ],
+    "interpretation": {
+      "RP < 70ms": "Typical AVNRT (P wave buried in QRS or pseudo-R' in V1)",
+      "RP 70-90ms": "AVNRT vs AVRT (need additional features)",
+      "Short RP (RP < PR)": "Orthodromic AVRT most likely if RP clearly visible",
+      "Long RP (RP > PR)": "Atypical AVNRT, Atrial Tachycardia, or PJRT"
+    }
+  },
+  {
+    "name": "Inferior STEMI Culprit Vessel Algorithm",
+    "purpose": "Differentiate RCA from LCx in inferior STEMI",
+    "year": 2021,
+    "accuracy": "86% with combined criteria",
+    "citation": "Multiple validation studies",
+    "full_explanation": "When inferior STEMI is identified (ST elevation in II, III, aVF), determining whether RCA or LCx is the culprit helps predict complications (RV involvement with RCA) and plan intervention.",
+    "steps": [
+      {
+        "number": 1,
+        "criterion": "Compare ST elevation in III vs II",
+        "explanation": "If ST elevation in lead III > lead II, this strongly suggests RCA. If ST elevation in II ≥ III, consider LCx."
+      },
+      {
+        "number": 2,
+        "criterion": "Check lead I for ST changes",
+        "explanation": "ST depression in lead I suggests RCA (sensitivity ~90%). ST elevation or isoelectric in lead I suggests LCx."
+      },
+      {
+        "number": 3,
+        "criterion": "Check lead V1 for ST changes",
+        "explanation": "ST elevation in V1 suggests RCA (right ventricular involvement). ST depression in V1 suggests LCx (posterior involvement)."
+      },
+      {
+        "number": 4,
+        "criterion": "Apply combined algorithm: III>II AND ST depression in I AND ST elevation V1",
+        "explanation": "If all three present, very high probability of RCA. If opposite pattern (II≥III, ST elevation I, ST depression V1), likely LCx."
+      }
+    ],
+    "interpretation": {
+      "RCA likely": "III > II, ST depression in I, ST elevation in V1",
+      "LCx likely": "II ≥ III, ST elevation in I, ST depression in V1",
+      "Check V4R": "Always check V4R if RCA suspected - ST elevation indicates RV infarction"
+    }
+  }
+]
