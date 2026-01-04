@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECG Guru - Case History & Analytics</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="history.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                    </svg>
+                    ECG Guru
+                </h1>
+                <p class="tagline">Case History & Analytics</p>
+            </div>
+            <div class="header-controls">
+                <button id="darkModeToggle" class="icon-button" title="Toggle Dark Mode">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="tab-btn active" data-view="library">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+                Case Library
+            </button>
+            <button class="tab-btn" data-view="analytics">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+                Analytics
+            </button>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content" style="padding: 24px;">
+            <!-- Case Library View -->
+            <div id="libraryView" class="view-container">
+                <!-- Will be populated by history.js -->
+            </div>
+
+            <!-- Analytics View -->
+            <div id="analyticsView" class="view-container hidden">
+                <!-- Will be populated by history.js -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="app.js"></script>
+    <script src="history.js"></script>
+    <script>
+        // Demo initialization
+        let currentView = 'library';
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Initialize dark mode
+            const savedMode = localStorage.getItem('darkMode');
+            if (savedMode === 'true') {
+                document.body.classList.add('dark-mode');
+            }
+
+            document.getElementById('darkModeToggle').addEventListener('click', () => {
+                document.body.classList.toggle('dark-mode');
+                const isDark = document.body.classList.contains('dark-mode');
+                localStorage.setItem('darkMode', isDark);
+            });
+
+            // Initialize History UI
+            await historyUI.init();
+
+            // Load initial view
+            await loadView('library');
+
+            // Tab navigation
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const view = e.currentTarget.dataset.view;
+                    await loadView(view);
+
+                    // Update active tab
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    e.currentTarget.classList.add('active');
+                });
+            });
+
+            // Generate some demo data if database is empty
+            await generateDemoDataIfNeeded();
+        });
+
+        async function loadView(view) {
+            currentView = view;
+
+            // Hide all views
+            document.querySelectorAll('.view-container').forEach(v => v.classList.add('hidden'));
+
+            if (view === 'library') {
+                document.getElementById('libraryView').classList.remove('hidden');
+                await historyUI.renderCaseLibrary('libraryView');
+            } else if (view === 'analytics') {
+                document.getElementById('analyticsView').classList.remove('hidden');
+                await historyUI.renderAnalyticsDashboard('analyticsView');
+            }
+        }
+
+        async function generateDemoDataIfNeeded() {
+            const cases = await historyUI.db.getAllCases();
+
+            // If no cases exist, generate demo data
+            if (cases.length === 0) {
+                console.log('Generating demo data...');
+
+                const demoAnalyses = [
+                    {
+                        summary: 'Sinus rhythm with ST segment elevation in leads V2-V4 suggestive of anterior STEMI. Immediate cardiology consultation recommended.',
+                        is_urgent: true,
+                        measurements: {
+                            heart_rate: 82,
+                            pr_interval_ms: 160,
+                            qrs_duration_ms: 95,
+                            qt_interval_ms: 380,
+                            qtc_ms: 425,
+                            axis_degrees: 50,
+                            rhythm: 'Sinus'
+                        },
+                        findings: [
+                            {
+                                category: 'ST Segment',
+                                finding: 'ST Elevation',
+                                explanation: 'Significant ST elevation in V2-V4 indicating acute anterior STEMI',
+                                severity: 'critical'
+                            },
+                            {
+                                category: 'Rhythm',
+                                finding: 'Normal Sinus Rhythm',
+                                explanation: 'Regular rhythm with normal P waves',
+                                severity: 'normal'
+                            }
+                        ],
+                        algorithm_results: [],
+                        userLevel: 'student'
+                    },
+                    {
+                        summary: 'Wide complex tachycardia with characteristics favoring ventricular tachycardia. Immediate intervention required.',
+                        is_urgent: true,
+                        measurements: {
+                            heart_rate: 185,
+                            pr_interval_ms: null,
+                            qrs_duration_ms: 145,
+                            qt_interval_ms: null,
+                            qtc_ms: null,
+                            axis_degrees: -90,
+                            rhythm: 'VT'
+                        },
+                        findings: [
+                            {
+                                category: 'Arrhythmia',
+                                finding: 'Ventricular Tachycardia',
+                                explanation: 'Wide complex tachycardia with Brugada criteria favoring VT',
+                                severity: 'critical'
+                            }
+                        ],
+                        algorithm_results: [
+                            {
+                                name: 'Brugada Algorithm',
+                                conclusion: 'Ventricular Tachycardia',
+                                steps: ['Absence of RS complex in precordial leads', 'R to S interval > 100ms', 'AV dissociation present']
+                            }
+                        ],
+                        userLevel: 'resident'
+                    },
+                    {
+                        summary: 'Pre-excitation pattern consistent with WPW syndrome. Delta waves visible. Pathway localization suggests left lateral accessory pathway.',
+                        is_urgent: false,
+                        measurements: {
+                            heart_rate: 72,
+                            pr_interval_ms: 90,
+                            qrs_duration_ms: 130,
+                            qt_interval_ms: 360,
+                            qtc_ms: 390,
+                            axis_degrees: 30,
+                            rhythm: 'Sinus with pre-excitation'
+                        },
+                        findings: [
+                            {
+                                category: 'Conduction',
+                                finding: 'WPW Pattern',
+                                explanation: 'Short PR interval with delta waves indicating pre-excitation',
+                                severity: 'abnormal'
+                            }
+                        ],
+                        algorithm_results: [
+                            {
+                                name: 'SMART-WPW Algorithm',
+                                conclusion: 'Left Lateral Pathway',
+                                steps: ['Delta wave positive in V1', 'R/S ratio in V1 < 1', 'Transition in V3-V4']
+                            }
+                        ],
+                        userLevel: 'cardiologist'
+                    },
+                    {
+                        summary: 'Normal sinus rhythm. All intervals within normal limits. No acute abnormalities detected.',
+                        is_urgent: false,
+                        measurements: {
+                            heart_rate: 68,
+                            pr_interval_ms: 165,
+                            qrs_duration_ms: 88,
+                            qt_interval_ms: 390,
+                            qtc_ms: 415,
+                            axis_degrees: 45,
+                            rhythm: 'Normal Sinus'
+                        },
+                        findings: [
+                            {
+                                category: 'Overall',
+                                finding: 'Normal ECG',
+                                explanation: 'All parameters within normal limits',
+                                severity: 'normal'
+                            }
+                        ],
+                        algorithm_results: [],
+                        userLevel: 'student'
+                    },
+                    {
+                        summary: 'Atrial fibrillation with rapid ventricular response. Consider rate control.',
+                        is_urgent: false,
+                        measurements: {
+                            heart_rate: 142,
+                            pr_interval_ms: null,
+                            qrs_duration_ms: 92,
+                            qt_interval_ms: 320,
+                            qtc_ms: 480,
+                            axis_degrees: 40,
+                            rhythm: 'Atrial Fibrillation'
+                        },
+                        findings: [
+                            {
+                                category: 'Arrhythmia',
+                                finding: 'Atrial Fibrillation with RVR',
+                                explanation: 'Irregularly irregular rhythm without discrete P waves, rate > 100',
+                                severity: 'abnormal'
+                            }
+                        ],
+                        algorithm_results: [],
+                        userLevel: 'rmp'
+                    }
+                ];
+
+                // Create demo image (simple gradient)
+                const canvas = document.createElement('canvas');
+                canvas.width = 800;
+                canvas.height = 400;
+                const ctx = canvas.getContext('2d');
+                const gradient = ctx.createLinearGradient(0, 0, 800, 400);
+                gradient.addColorStop(0, '#667eea');
+                gradient.addColorStop(1, '#764ba2');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 800, 400);
+
+                // Add ECG-like pattern
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(0, 200);
+                for (let x = 0; x < 800; x += 100) {
+                    ctx.lineTo(x + 20, 200);
+                    ctx.lineTo(x + 30, 100);
+                    ctx.lineTo(x + 40, 250);
+                    ctx.lineTo(x + 50, 200);
+                    ctx.lineTo(x + 100, 200);
+                }
+                ctx.stroke();
+
+                const demoImageData = canvas.toDataURL('image/jpeg', 0.8);
+
+                // Save demo cases with staggered timestamps
+                const now = Date.now();
+                for (let i = 0; i < demoAnalyses.length; i++) {
+                    const analysis = demoAnalyses[i];
+                    const timestamp = now - (i * 24 * 60 * 60 * 1000) - Math.random() * 12 * 60 * 60 * 1000;
+
+                    const caseData = {
+                        timestamp: timestamp,
+                        diagnosis: historyUI.caseLibrary.extractPrimaryDiagnosis(analysis),
+                        summary: analysis.summary,
+                        severity: historyUI.caseLibrary.determineSeverity(analysis),
+                        measurements: analysis.measurements,
+                        findings: analysis.findings,
+                        algorithmResults: analysis.algorithm_results,
+                        imageThumbnail: demoImageData,
+                        imageData: demoImageData,
+                        conversationHistory: [],
+                        tags: historyUI.caseLibrary.generateTags(analysis),
+                        notes: `Demo case ${i + 1}`,
+                        userLevel: analysis.userLevel
+                    };
+
+                    await historyUI.db.saveCase(caseData);
+                }
+
+                // Reload the view
+                await loadView(currentView);
+            }
+        }
+    </script>
+
+    <style>
+        /* Additional styles for demo page */
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border-color, #e5e7eb);
+            background: var(--bg-primary, #ffffff);
+        }
+
+        .tab-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary, #6b7280);
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .tab-btn:hover {
+            color: var(--color-primary, #2563eb);
+        }
+
+        .tab-btn.active {
+            color: var(--color-primary, #2563eb);
+            border-bottom-color: var(--color-primary, #2563eb);
+        }
+
+        .view-container {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        body.dark-mode .nav-tabs {
+            background: #1f2937;
+            border-bottom-color: #374151;
+        }
+    </style>
+</body>
+</html>

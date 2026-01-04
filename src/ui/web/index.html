@@ -1,224 +1,483 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Essential Meta Tags -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ECG Guru - AI-Powered ECG Analysis</title>
+    <meta name="description" content="ECG Guru - AI-powered ECG analysis with expert-level interpretation. Your seasoned electrophysiologist in your pocket.">
+    <meta name="keywords" content="ECG, EKG, cardiology, electrophysiology, AI, medical analysis">
+    <meta name="author" content="ECG Guru">
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ECG Guru">
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="ECG Guru - AI-Powered ECG Analysis">
+    <meta property="og:description" content="Expert-level ECG interpretation powered by validated algorithms and AI">
+    <meta property="og:type" content="website">
+
+    <!-- Favicon and App Icons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.json">
+
+    <title>ECG Guru - AI-Powered ECG Analysis & Teaching Platform</title>
+
+    <!-- Stylesheets -->
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="teaching.css">
+
+    <!-- Preconnect for Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
 </head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
-                <h1>
-                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                    </svg>
-                    ECG Guru
-                </h1>
-                <p class="tagline">Your Expert Electrophysiologist in Your Pocket</p>
+<body class="ecg-app">
+    <!-- ============================================
+         HEADER: Logo + User Level + Settings
+         ============================================ -->
+    <header class="header" role="banner">
+        <div class="header__container">
+            <!-- Logo -->
+            <div class="header__brand">
+                <svg class="header__logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                <div class="header__brand-text">
+                    <h1 class="header__title">ECG Guru</h1>
+                    <p class="header__tagline">Your Expert Electrophysiologist</p>
+                </div>
             </div>
-            <div class="header-controls">
-                <button id="darkModeToggle" class="icon-button" title="Toggle Dark Mode">
+
+            <!-- User Level Selector -->
+            <div class="header__level-selector">
+                <label for="userLevelSelect" class="header__level-label">Experience Level:</label>
+                <div class="select-wrapper">
+                    <select id="userLevelSelect" class="select select--level" aria-label="Select your experience level">
+                        <option value="rmp" data-icon="🏥">Village Practitioner (RMP)</option>
+                        <option value="student" data-icon="📚" selected>Medical Student</option>
+                        <option value="resident" data-icon="👨‍⚕️">Cardiology Resident</option>
+                        <option value="cardiologist" data-icon="❤️">Cardiologist</option>
+                    </select>
+                    <svg class="select__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </div>
+                <div class="level-description" id="levelDescription" role="status" aria-live="polite">
+                    Educational explanations with component identification
+                </div>
+            </div>
+
+            <!-- Header Controls -->
+            <div class="header__controls">
+                <button
+                    id="teachingModeToggle"
+                    class="header__btn header__btn--teaching"
+                    aria-label="Toggle teaching mode"
+                    aria-pressed="true"
+                    title="Teaching Mode">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                    </svg>
+                    <span class="header__btn-label">Teach</span>
+                </button>
+
+                <button
+                    id="darkModeToggle"
+                    class="header__btn header__btn--theme"
+                    aria-label="Toggle dark mode"
+                    aria-pressed="false"
+                    title="Toggle Dark Mode">
+                    <svg class="theme-icon theme-icon--light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"/>
+                        <line x1="12" y1="1" x2="12" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="23"/>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                        <line x1="1" y1="12" x2="3" y2="12"/>
+                        <line x1="21" y1="12" x2="23" y2="12"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                    </svg>
+                    <svg class="theme-icon theme-icon--dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
                     </svg>
                 </button>
+
+                <button
+                    id="settingsBtn"
+                    class="header__btn header__btn--settings"
+                    aria-label="Open settings"
+                    title="Settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"/>
+                    </svg>
+                </button>
             </div>
-        </header>
+        </div>
+    </header>
 
-        <div class="main-content">
-            <!-- Left Panel: Upload and Controls -->
-            <div class="left-panel">
-                <!-- ECG Upload Section -->
-                <section class="card upload-section">
-                    <h2>Upload ECG</h2>
+    <!-- ============================================
+         MAIN CONTENT
+         ============================================ -->
+    <main class="main" role="main">
+        <!-- ============================================
+             HERO: ECG Upload Zone
+             ============================================ -->
+        <section class="hero" aria-labelledby="heroTitle">
+            <div class="hero__container">
+                <div
+                    id="dropZone"
+                    class="upload-zone"
+                    role="button"
+                    tabindex="0"
+                    aria-label="Upload ECG image"
+                    aria-describedby="uploadInstructions">
 
-                    <div id="dropZone" class="drop-zone">
-                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <!-- Empty State -->
+                    <div class="upload-zone__empty" id="uploadEmptyState">
+                        <!-- Animated Pulse ECG Wave -->
+                        <div class="pulse-animation" aria-hidden="true">
+                            <svg class="pulse-wave" viewBox="0 0 200 60" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M0 30 L40 30 L45 15 L50 45 L55 20 L60 35 L65 30 L200 30" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+
+                        <svg class="upload-zone__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="17 8 12 3 7 8"/>
                             <line x1="12" y1="3" x2="12" y2="15"/>
                         </svg>
-                        <p class="drop-zone-text">Drag & drop ECG image here</p>
-                        <p class="drop-zone-subtext">or</p>
-                        <button id="fileSelectBtn" class="btn btn-secondary">Select File</button>
-                        <button id="cameraBtn" class="btn btn-secondary">
+
+                        <h2 id="heroTitle" class="upload-zone__title">Upload Your ECG</h2>
+                        <p id="uploadInstructions" class="upload-zone__description">
+                            Drag and drop your ECG image here, or choose from options below
+                        </p>
+
+                        <div class="upload-zone__actions">
+                            <button id="browseBtn" class="btn btn--primary btn--large">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Browse Files
+                            </button>
+
+                            <button id="cameraBtn" class="btn btn--secondary btn--large">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                    <circle cx="12" cy="13" r="4"/>
+                                </svg>
+                                Capture Photo
+                            </button>
+                        </div>
+
+                        <p class="upload-zone__hint">
+                            Supports: JPG, PNG, PDF • Max size: 10MB
+                        </p>
+                    </div>
+
+                    <!-- Preview State -->
+                    <div class="upload-zone__preview hidden" id="uploadPreviewState">
+                        <div class="preview-container">
+                            <img id="previewImage" class="preview-image" alt="ECG preview" />
+                            <button
+                                id="removeImageBtn"
+                                class="preview__remove-btn"
+                                aria-label="Remove image"
+                                title="Remove image">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"/>
+                                    <line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <button id="analyzeBtn" class="btn btn--primary btn--analyze btn--large">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                                <circle cx="12" cy="13" r="4"/>
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                             </svg>
-                            Capture
+                            Analyze ECG
+                            <span class="btn__indicator" aria-hidden="true"></span>
                         </button>
-                        <input type="file" id="fileInput" accept="image/*" hidden>
-                        <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
                     </div>
 
-                    <div id="imagePreview" class="image-preview hidden">
-                        <img id="previewImage" alt="ECG Preview">
-                        <button id="clearImage" class="btn-clear">×</button>
-                    </div>
-                </section>
-
-                <!-- User Level Selector -->
-                <section class="card user-level-section">
-                    <h2>Your Experience Level</h2>
-                    <div class="user-level-options">
-                        <label class="radio-option">
-                            <input type="radio" name="userLevel" value="rmp">
-                            <span class="radio-label">
-                                <strong>RMP / Village Practitioner</strong>
-                                <small>Simple verdicts, red flags</small>
-                            </span>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="userLevel" value="student" checked>
-                            <span class="radio-label">
-                                <strong>MBBS Student / Resident</strong>
-                                <small>Educational explanations</small>
-                            </span>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="userLevel" value="resident">
-                            <span class="radio-label">
-                                <strong>MD/DM Cardiology Resident</strong>
-                                <small>Detailed analysis, differentials</small>
-                            </span>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="userLevel" value="cardiologist">
-                            <span class="radio-label">
-                                <strong>Practicing Cardiologist</strong>
-                                <small>Expert-level analysis</small>
-                            </span>
-                        </label>
-                    </div>
-                </section>
-
-                <!-- Teaching Mode Toggle -->
-                <section class="card teaching-mode-section">
-                    <div class="toggle-container">
-                        <label class="toggle-label">
-                            <input type="checkbox" id="teachingMode" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <div class="toggle-text">
-                            <strong>Teaching Mode</strong>
-                            <small>Include educational explanations</small>
+                    <!-- Loading State -->
+                    <div class="upload-zone__loading hidden" id="uploadLoadingState">
+                        <div class="loading-spinner" aria-hidden="true"></div>
+                        <p class="loading-text" id="loadingStatusText">Analyzing your ECG...</p>
+                        <div class="loading-progress">
+                            <div class="progress-bar">
+                                <div class="progress-bar__fill" id="progressBarFill"></div>
+                            </div>
+                            <p class="loading-substep" id="loadingSubstep">Processing image...</p>
                         </div>
                     </div>
-                </section>
 
-                <!-- Analyze Button -->
-                <button id="analyzeBtn" class="btn btn-primary" disabled>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                    </svg>
-                    Analyze ECG
-                </button>
+                    <!-- Hidden File Inputs -->
+                    <input type="file" id="fileInput" accept="image/*,.pdf" hidden aria-hidden="true">
+                    <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden aria-hidden="true">
+                </div>
             </div>
+        </section>
 
-            <!-- Right Panel: Results and Chat -->
-            <div class="right-panel">
-                <!-- Welcome Screen -->
-                <div id="welcomeScreen" class="welcome-screen">
-                    <svg class="welcome-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        <!-- ============================================
+             TWO-COLUMN LAYOUT: Analysis + Chat
+             ============================================ -->
+        <div class="content-grid">
+            <!-- ============================================
+                 LEFT: ANALYSIS PANEL
+                 ============================================ -->
+            <aside class="analysis-panel" role="complementary" aria-labelledby="analysisTitle">
+                <h2 id="analysisTitle" class="sr-only">ECG Analysis Results</h2>
+
+                <!-- Empty State -->
+                <div class="analysis-panel__empty" id="analysisEmptyState">
+                    <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        <path d="M3 9h18M9 21V9"/>
                     </svg>
-                    <h2>Welcome to ECG Guru</h2>
-                    <p>Upload an ECG image to get started with AI-powered analysis</p>
-                    <div class="feature-list">
-                        <div class="feature-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="20 6 9 17 4 12"/>
-                            </svg>
-                            <span>Instant expert-level analysis</span>
-                        </div>
-                        <div class="feature-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="20 6 9 17 4 12"/>
-                            </svg>
-                            <span>Validated algorithm engine</span>
-                        </div>
-                        <div class="feature-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="20 6 9 17 4 12"/>
-                            </svg>
-                            <span>Interactive teaching mode</span>
-                        </div>
-                        <div class="feature-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="20 6 9 17 4 12"/>
-                            </svg>
-                            <span>Chat with your ECG</span>
-                        </div>
-                    </div>
+                    <h3 class="empty-state__title">No Analysis Yet</h3>
+                    <p class="empty-state__description">
+                        Upload an ECG image above to see detailed analysis, measurements, and algorithm results
+                    </p>
                 </div>
 
-                <!-- Analysis Results (Hidden initially) -->
-                <div id="resultsContainer" class="results-container hidden">
+                <!-- Results Container -->
+                <div class="analysis-panel__results hidden" id="analysisResults">
                     <!-- Summary Card -->
-                    <section class="card summary-card">
-                        <div class="summary-header">
-                            <h2>Analysis Summary</h2>
-                            <span id="urgencyBadge" class="badge"></span>
+                    <section class="card card--summary" aria-labelledby="summaryTitle">
+                        <div class="card__header">
+                            <h3 id="summaryTitle" class="card__title">Summary</h3>
+                            <span id="urgencyBadge" class="badge badge--info" role="status"></span>
                         </div>
-                        <p id="summaryText" class="summary-text"></p>
+                        <div class="card__body">
+                            <p id="summaryText" class="summary-text"></p>
+
+                            <!-- Critical Alert Banner -->
+                            <div id="criticalAlert" class="alert alert--critical hidden" role="alert">
+                                <svg class="alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="12" y1="8" x2="12" y2="12"/>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                                </svg>
+                                <div class="alert__content">
+                                    <h4 class="alert__title">Critical Finding</h4>
+                                    <p id="criticalAlertText" class="alert__message"></p>
+                                </div>
+                            </div>
+                        </div>
                     </section>
 
-                    <!-- Measurements -->
-                    <section class="card measurements-card">
-                        <h2>Measurements</h2>
-                        <div id="measurementsGrid" class="measurements-grid"></div>
+                    <!-- Measurements Card -->
+                    <section class="card card--measurements" aria-labelledby="measurementsTitle">
+                        <div class="card__header">
+                            <h3 id="measurementsTitle" class="card__title">Measurements</h3>
+                            <button class="card__action-btn" id="measurementsInfoBtn" aria-label="Measurement information">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M12 16v-4M12 8h.01"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="card__body">
+                            <!-- Loading Skeleton -->
+                            <div class="measurements-skeleton" id="measurementsSkeleton">
+                                <div class="skeleton-item"></div>
+                                <div class="skeleton-item"></div>
+                                <div class="skeleton-item"></div>
+                                <div class="skeleton-item"></div>
+                            </div>
+
+                            <!-- Measurements Grid -->
+                            <div id="measurementsGrid" class="measurements-grid hidden"></div>
+                        </div>
                     </section>
 
-                    <!-- Findings -->
-                    <section class="card findings-card">
-                        <h2>Findings</h2>
-                        <div id="findingsList" class="findings-list"></div>
+                    <!-- Findings Card -->
+                    <section class="card card--findings" aria-labelledby="findingsTitle">
+                        <div class="card__header">
+                            <h3 id="findingsTitle" class="card__title">Findings</h3>
+                            <span id="findingsCount" class="count-badge" aria-label="Number of findings">0</span>
+                        </div>
+                        <div class="card__body">
+                            <!-- Loading Skeleton -->
+                            <div class="findings-skeleton" id="findingsSkeleton">
+                                <div class="skeleton-item skeleton-item--finding"></div>
+                                <div class="skeleton-item skeleton-item--finding"></div>
+                                <div class="skeleton-item skeleton-item--finding"></div>
+                            </div>
+
+                            <!-- Findings List -->
+                            <ul id="findingsList" class="findings-list hidden" role="list"></ul>
+                        </div>
                     </section>
 
-                    <!-- Algorithm Results -->
-                    <section id="algorithmsSection" class="card algorithms-card hidden">
-                        <h2>Algorithm Analysis</h2>
-                        <div id="algorithmsList" class="algorithms-list"></div>
+                    <!-- Algorithm Results Card -->
+                    <section class="card card--algorithms hidden" id="algorithmsCard" aria-labelledby="algorithmsTitle">
+                        <div class="card__header">
+                            <h3 id="algorithmsTitle" class="card__title">Algorithm Analysis</h3>
+                            <span class="badge badge--algorithm">Expert Level</span>
+                        </div>
+                        <div class="card__body">
+                            <div id="algorithmsList" class="algorithms-list"></div>
+                        </div>
                     </section>
+                </div>
+            </aside>
 
-                    <!-- Chat Interface -->
-                    <section class="card chat-card">
-                        <h2>Ask Questions About This ECG</h2>
-                        <div id="chatMessages" class="chat-messages"></div>
-                        <div class="chat-input-container">
-                            <input
-                                type="text"
+            <!-- ============================================
+                 RIGHT: CHAT PANEL
+                 ============================================ -->
+            <section class="chat-panel" aria-labelledby="chatTitle">
+                <div class="chat-panel__container">
+                    <!-- Chat Header -->
+                    <div class="chat-panel__header">
+                        <h2 id="chatTitle" class="chat-panel__title">
+                            <svg class="chat-panel__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            </svg>
+                            Ask About This ECG
+                        </h2>
+                        <button id="clearChatBtn" class="chat-panel__clear-btn" aria-label="Clear chat history" title="Clear chat">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div class="chat-panel__empty" id="chatEmptyState">
+                        <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                            <path d="M8 10h8M8 14h5"/>
+                        </svg>
+                        <h3 class="empty-state__title">Start a Conversation</h3>
+                        <p class="empty-state__description">
+                            Once you analyze an ECG, you can ask questions and get expert explanations
+                        </p>
+                    </div>
+
+                    <!-- Chat Messages -->
+                    <div
+                        id="chatMessages"
+                        class="chat-messages hidden"
+                        role="log"
+                        aria-live="polite"
+                        aria-atomic="false"></div>
+
+                    <!-- Suggested Questions -->
+                    <div id="suggestedQuestions" class="suggested-questions hidden" role="group" aria-labelledby="suggestionsTitle">
+                        <h4 id="suggestionsTitle" class="suggested-questions__title">Suggested questions:</h4>
+                        <div class="suggested-questions__list"></div>
+                    </div>
+
+                    <!-- Chat Input -->
+                    <div class="chat-input-container">
+                        <div class="chat-input-wrapper">
+                            <textarea
                                 id="chatInput"
-                                placeholder="Ask about this ECG..."
                                 class="chat-input"
-                            >
-                            <button id="sendChatBtn" class="btn-send">
+                                placeholder="Ask about this ECG..."
+                                rows="1"
+                                aria-label="Chat message input"
+                                disabled></textarea>
+                            <button
+                                id="sendChatBtn"
+                                class="chat-input__send-btn"
+                                aria-label="Send message"
+                                disabled>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <line x1="22" y1="2" x2="11" y2="13"/>
                                     <polygon points="22 2 15 22 11 13 2 9 22 2"/>
                                 </svg>
                             </button>
                         </div>
-                        <div id="suggestedQuestions" class="suggested-questions"></div>
-                    </section>
+                        <p class="chat-input__hint">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                            Responses are educational and not a substitute for professional medical judgment
+                        </p>
+                    </div>
                 </div>
+            </section>
+        </div>
 
-                <!-- Loading State -->
-                <div id="loadingScreen" class="loading-screen hidden">
-                    <div class="spinner"></div>
-                    <p id="loadingText">Analyzing ECG...</p>
+        <!-- ============================================
+             TEACHING MODE: Expandable Section
+             ============================================ -->
+        <section class="teaching-section hidden" id="teachingSection" aria-labelledby="teachingSectionTitle">
+            <div class="teaching-section__container">
+                <button
+                    class="teaching-section__toggle"
+                    id="teachingSectionToggle"
+                    aria-expanded="false"
+                    aria-controls="teachingContent">
+                    <div class="teaching-section__toggle-header">
+                        <svg class="teaching-section__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                        </svg>
+                        <div>
+                            <h3 id="teachingSectionTitle" class="teaching-section__title">Teaching Module</h3>
+                            <p class="teaching-section__subtitle">Learn ECG interpretation step by step</p>
+                        </div>
+                    </div>
+                    <svg class="teaching-section__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </button>
+
+                <div id="teachingContent" class="teaching-section__content" hidden>
+                    <div class="teaching-tabs" role="tablist" aria-label="Teaching sections">
+                        <button class="teaching-tab teaching-tab--active" role="tab" aria-selected="true" aria-controls="component-panel" id="component-tab">
+                            Components
+                        </button>
+                        <button class="teaching-tab" role="tab" aria-selected="false" aria-controls="interpretation-panel" id="interpretation-tab">
+                            Interpretation
+                        </button>
+                        <button class="teaching-tab" role="tab" aria-selected="false" aria-controls="algorithms-panel" id="algorithms-tab">
+                            Algorithms
+                        </button>
+                    </div>
+
+                    <div class="teaching-panels">
+                        <div id="component-panel" class="teaching-panel" role="tabpanel" aria-labelledby="component-tab">
+                            <div class="teaching-content" id="componentContent"></div>
+                        </div>
+                        <div id="interpretation-panel" class="teaching-panel hidden" role="tabpanel" aria-labelledby="interpretation-tab">
+                            <div class="teaching-content" id="interpretationContent"></div>
+                        </div>
+                        <div id="algorithms-panel" class="teaching-panel hidden" role="tabpanel" aria-labelledby="algorithms-tab">
+                            <div class="teaching-content" id="algorithmsContent"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
+        </section>
+    </main>
 
-    <!-- Toast Notifications -->
-    <div id="toastContainer" class="toast-container"></div>
+    <!-- ============================================
+         TOAST NOTIFICATIONS
+         ============================================ -->
+    <div
+        id="toastContainer"
+        class="toast-container"
+        role="region"
+        aria-live="polite"
+        aria-label="Notifications"></div>
 
-    <script src="app.js"></script>
+    <!-- ============================================
+         SCRIPTS
+         ============================================ -->
+    <script src="teaching.js" defer></script>
+    <script src="app.js" defer></script>
 </body>
 </html>
