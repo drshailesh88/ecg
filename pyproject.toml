@@ -22,8 +22,10 @@ dependencies = [
     # API Server
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
+    # LLM
+    "anthropic>=0.40.0",  # Claude API for expert explanations
+    "ollama>=0.1.0",  # Fallback/self-hosted option
     # Core
-    "ollama>=0.1.0",
     "chromadb>=0.4.0",
     "pydantic>=2.0.0",
     "httpx>=0.25.0",

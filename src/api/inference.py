@@ -4,11 +4,13 @@ Inference Engine for ECG Guru API
 Server-side inference engine that:
 - Processes ECG images
 - Runs diagnostic algorithms
-- Generates explanations via LLM + RAG
+- Generates explanations via Claude API
 - Adapts output to user expertise level
 
-Since this runs on YOUR server, you control the hardware and can use
-more powerful models than would be possible on user devices.
+Architecture:
+- Algorithms: Validated, deterministic (Brugada, Basel, SMART-WPW)
+- LLM: Claude API for expert-level explanations
+- Fallback: Templated responses when API unavailable
 """
 
 import asyncio
@@ -19,7 +21,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any, AsyncGenerator
 
-from ..knowledge.advanced_rag import ECGKnowledgeRAG, RetrievedDocument
+# Import LLM client (Claude API)
+from ..ai.llm_client import (
+    LLMClient,
+    LLMConfig,
+    UserLevel as LLMUserLevel,
+    explain_ecg,
+)
+
+# Import algorithms
 from ..core.algorithms import (
     BrugadaAlgorithm,
     VereckeiAlgorithm,
@@ -31,49 +41,62 @@ from ..core.algorithms import (
     analyze_stemi,
 )
 
+# RAG is optional - gracefully handle if not available
+try:
+    from ..knowledge.advanced_rag import ECGKnowledgeRAG, RetrievedDocument
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
+    ECGKnowledgeRAG = None
+    RetrievedDocument = None
+
 
 class InferenceEngine:
     """
     Server-side inference engine for ECG analysis.
 
-    Designed to run on a server with:
-    - 16-32GB RAM (or more)
-    - Optional GPU for faster inference
-    - Access to full knowledge base
+    Uses:
+    - Claude API for expert-level explanations (primary)
+    - Validated algorithms for diagnosis (Brugada, Basel, etc.)
+    - Optional RAG for knowledge retrieval
     """
 
     def __init__(
         self,
-        llm_model: str = "qwen2.5:7b",
+        llm_model: str = "claude-sonnet-4-20250514",
         knowledge_dir: Path = None,
-        use_gpu: bool = True,
+        anthropic_api_key: str = None,
     ):
         self.llm_model = llm_model
         self.knowledge_dir = knowledge_dir or Path("./data")
-        self.use_gpu = use_gpu
 
-        # Initialize components lazily
-        self._ollama = None
+        # Initialize Claude client
+        config = LLMConfig(api_key=anthropic_api_key, model=llm_model)
+        self._llm_client = LLMClient(config)
+
+        # Optional components
         self._rag = None
         self._analysis_cache: Dict[str, Any] = {}
 
     @property
-    def ollama(self):
-        """Lazy-load Ollama client"""
-        if self._ollama is None:
-            import ollama
-            self._ollama = ollama
-        return self._ollama
+    def llm(self) -> LLMClient:
+        """Get LLM client"""
+        return self._llm_client
 
     @property
-    def rag(self) -> ECGKnowledgeRAG:
-        """Lazy-load RAG pipeline"""
+    def rag(self):
+        """Lazy-load RAG pipeline (optional)"""
+        if not RAG_AVAILABLE:
+            return None
         if self._rag is None:
-            self._rag = ECGKnowledgeRAG(
-                persist_dir=self.knowledge_dir / "chroma_db",
-                embedding_model="pubmedbert",
-                use_reranker=True,
-            )
+            try:
+                self._rag = ECGKnowledgeRAG(
+                    persist_dir=self.knowledge_dir / "chroma_db",
+                    embedding_model="pubmedbert",
+                    use_reranker=True,
+                )
+            except Exception:
+                self._rag = None
         return self._rag
 
     # ========================================================================
@@ -474,90 +497,76 @@ class InferenceEngine:
         self,
         measurements: Dict,
         findings: List[Dict],
-        algorithm_results: List[Dict],
+        algorithm_results: Dict[str, Any],
         user_level: str,
         clinical_context: str = None,
     ) -> Dict[str, Any]:
-        """Generate interpretation using LLM + RAG"""
+        """Generate interpretation using Claude API"""
 
-        # Build query for RAG
-        finding_summaries = [f["finding"] for f in findings]
-        query = f"ECG interpretation for: {', '.join(finding_summaries)}"
-
-        # Retrieve relevant knowledge
-        docs, context = self.rag.query_with_context(
-            query,
-            top_k=5,
-            use_multi_query=True,
-            use_reranking=True,
-        )
-
-        # Build prompt based on user level
-        level_instructions = {
-            "rmp": "Explain in very simple terms. Focus on: Is this normal? Is this urgent? Does patient need referral?",
-            "student": "Provide educational explanation. Include teaching points about the findings.",
-            "resident": "Detailed analysis with differential diagnosis. Include clinical reasoning.",
-            "cardiologist": "Expert-level analysis. Include nuances and edge cases.",
+        # Build algorithm results for LLM
+        llm_results = {
+            "measurements": measurements,
+            "findings": [{"finding": f["finding"], "severity": f["severity"]} for f in findings],
         }
 
-        prompt = f"""You are an expert electrophysiologist analyzing an ECG.
+        # Add algorithm results
+        if "stemi" in algorithm_results:
+            llm_results["stemi"] = algorithm_results["stemi"]
+        if "vt_svt_ensemble" in algorithm_results:
+            llm_results["vt_svt"] = algorithm_results["vt_svt_ensemble"]
 
-{level_instructions.get(user_level, level_instructions['student'])}
+        # Map user level to LLM user level
+        level_map = {
+            "rmp": LLMUserLevel.RMP,
+            "student": LLMUserLevel.STUDENT,
+            "resident": LLMUserLevel.RESIDENT,
+            "cardiologist": LLMUserLevel.CARDIOLOGIST,
+        }
+        llm_level = level_map.get(user_level, LLMUserLevel.STUDENT)
 
-ECG Measurements:
-- Heart Rate: {measurements.get('heart_rate', 'N/A')} bpm
-- PR Interval: {measurements.get('pr_interval_ms', 'N/A')} ms
-- QRS Duration: {measurements.get('qrs_duration_ms', 'N/A')} ms
-- QTc: {measurements.get('qtc_ms', 'N/A')} ms
-- Axis: {measurements.get('axis_degrees', 'N/A')} degrees
-- Rhythm: {measurements.get('rhythm', 'N/A')}
+        # Generate explanation with Claude
+        try:
+            explanation = await self.llm.analyze_async(
+                algorithm_results=llm_results,
+                user_level=llm_level,
+                user_question=clinical_context,
+            )
+        except Exception as e:
+            # Fallback to basic interpretation
+            explanation = f"Analysis complete. {findings[0]['finding'] if findings else 'No significant findings.'}"
 
-Findings:
-{self._format_findings(findings)}
-
-Algorithm Results:
-{self._format_algorithm_results(algorithm_results)}
-
-{f"Clinical Context: {clinical_context}" if clinical_context else ""}
-
-Knowledge Base Context:
-{context}
-
-Provide:
-1. A one-line summary
-2. Primary diagnosis with confidence
-3. Differential diagnoses (top 3)
-4. Is this urgent? (Yes/No and why)
-5. Recommended actions
-
-Be concise and clinically relevant. Cite sources when possible."""
-
-        # Generate with LLM
-        response = self.ollama.generate(
-            model=self.llm_model,
-            prompt=prompt,
-            options={"temperature": 0.3, "num_predict": 1024},
-        )
-
-        # Parse response (simplified - would need proper parsing)
-        llm_output = response.get("response", "")
-
-        # Determine urgency
+        # Determine urgency from findings
         is_urgent = any(f.get("severity") == "critical" for f in findings)
         urgency_reason = None
         if is_urgent:
             critical = [f for f in findings if f.get("severity") == "critical"]
             urgency_reason = f"Critical finding: {critical[0]['finding']}"
 
+        # Build actions based on findings
+        actions = ["Correlate with clinical context", "Compare with prior ECGs"]
+        if "stemi" in algorithm_results and algorithm_results["stemi"]["is_stemi"]:
+            actions = algorithm_results["stemi"]["recommended_actions"][:5]
+        elif "vt_svt_ensemble" in algorithm_results:
+            vt = algorithm_results["vt_svt_ensemble"]
+            if vt.get("consensus") == "VT":
+                actions = [
+                    "Assess hemodynamic stability immediately",
+                    "Prepare for cardioversion if unstable",
+                    "Consider antiarrhythmic therapy (procainamide, amiodarone)",
+                    "12-lead ECG comparison with prior",
+                    "Cardiology consult urgently",
+                ]
+
         return {
-            "summary": self._extract_summary(llm_output),
+            "summary": self._extract_summary(explanation),
             "primary_diagnosis": findings[0]["finding"] if findings else "Normal ECG",
-            "differentials": [],  # Would parse from LLM output
-            "confidence": 0.8,
+            "differentials": [],
+            "confidence": 0.85,
             "is_urgent": is_urgent,
             "urgency_reason": urgency_reason,
-            "actions": ["Correlate with clinical context", "Compare with prior ECGs"],
-            "sources": [doc.metadata.get("source", "Unknown") for doc in docs],
+            "actions": actions,
+            "sources": ["Claude AI Analysis", "Validated ECG Algorithms"],
+            "full_explanation": explanation,
         }
 
     def _format_findings(self, findings: List[Dict]) -> str:
@@ -644,61 +653,60 @@ Be concise and clinically relevant. Cite sources when possible."""
         user_level: str = "student",
         history: List[Dict] = None,
     ) -> Dict[str, Any]:
-        """Handle chat messages about ECG"""
+        """Handle chat messages about ECG using Claude"""
 
         # Get analysis context if available
-        analysis_context = ""
+        algorithm_results = {}
         if analysis_id and analysis_id in self._analysis_cache:
             analysis = self._analysis_cache[analysis_id]
-            analysis_context = f"""
-Previous ECG Analysis:
-- Summary: {analysis['summary']}
-- Diagnosis: {analysis['primary_diagnosis']}
-- Findings: {', '.join(f['finding'] for f in analysis['findings'])}
-"""
+            algorithm_results = {
+                "measurements": analysis.get("measurements", {}),
+                "findings": analysis.get("findings", []),
+            }
+            if "algorithm_results" in analysis:
+                for result in analysis["algorithm_results"]:
+                    if isinstance(result, dict) and "name" in result:
+                        algorithm_results[result["name"]] = result
 
-        # Query RAG for relevant knowledge
-        docs, rag_context = self.rag.query_with_context(
-            message,
-            top_k=3,
-            use_multi_query=True,
-        )
+        # Map user level
+        level_map = {
+            "rmp": LLMUserLevel.RMP,
+            "student": LLMUserLevel.STUDENT,
+            "resident": LLMUserLevel.RESIDENT,
+            "cardiologist": LLMUserLevel.CARDIOLOGIST,
+        }
+        llm_level = level_map.get(user_level, LLMUserLevel.STUDENT)
 
-        # Build chat prompt
-        history_text = ""
+        # Convert history to expected format
+        conversation_history = None
         if history:
-            for msg in history[-5:]:  # Last 5 messages
-                role = msg.get("role", "user")
-                content = msg.get("content", "")
-                history_text += f"{role.capitalize()}: {content}\n"
+            conversation_history = [
+                {"role": msg.get("role", "user"), "content": msg.get("content", "")}
+                for msg in history[-10:]  # Last 10 messages
+            ]
 
-        prompt = f"""You are an expert cardiologist and electrophysiologist.
-Answer the user's question about ECG or cardiology.
-
-{analysis_context}
-
-Relevant Knowledge:
-{rag_context}
-
-{f"Previous conversation:{chr(10)}{history_text}" if history_text else ""}
-
-User Question: {message}
-
-Provide a helpful, accurate answer. Be concise but thorough.
-Cite sources when using specific information from the knowledge base."""
-
-        response = self.ollama.generate(
-            model=self.llm_model,
-            prompt=prompt,
-            options={"temperature": 0.4, "num_predict": 512},
-        )
+        # Generate response with Claude
+        try:
+            response_text = await self.llm.analyze_async(
+                algorithm_results=algorithm_results,
+                user_level=llm_level,
+                user_question=message,
+                conversation_history=conversation_history,
+            )
+        except Exception as e:
+            response_text = f"I apologize, but I encountered an error processing your question. Please try again. Error: {str(e)}"
 
         # Generate suggested follow-up questions
-        suggested = self._generate_suggestions(message, docs)
+        suggested = [
+            "What are the clinical implications?",
+            "What should I look for on serial ECGs?",
+            "How does this affect patient management?",
+            "Can you explain this in simpler terms?",
+        ]
 
         return {
-            "response": response.get("response", ""),
-            "sources": [doc.metadata.get("source", "Unknown") for doc in docs],
+            "response": response_text,
+            "sources": ["Claude AI", "Validated ECG Algorithms"],
             "suggested_questions": suggested,
         }
 
@@ -709,46 +717,48 @@ Cite sources when using specific information from the knowledge base."""
         user_level: str = "student",
         history: List[Dict] = None,
     ) -> AsyncGenerator[str, None]:
-        """Stream chat response"""
-        # Similar to chat() but with streaming
-        docs, rag_context = self.rag.query_with_context(message, top_k=3)
+        """Stream chat response using Claude"""
+        # Get analysis context if available
+        algorithm_results = {}
+        if analysis_id and analysis_id in self._analysis_cache:
+            analysis = self._analysis_cache[analysis_id]
+            algorithm_results = {
+                "measurements": analysis.get("measurements", {}),
+                "findings": analysis.get("findings", []),
+            }
 
-        prompt = f"""You are an expert cardiologist. Answer concisely:
+        # Map user level
+        level_map = {
+            "rmp": LLMUserLevel.RMP,
+            "student": LLMUserLevel.STUDENT,
+            "resident": LLMUserLevel.RESIDENT,
+            "cardiologist": LLMUserLevel.CARDIOLOGIST,
+        }
+        llm_level = level_map.get(user_level, LLMUserLevel.STUDENT)
 
-Knowledge:
-{rag_context}
-
-Question: {message}"""
-
-        response = self.ollama.generate(
-            model=self.llm_model,
-            prompt=prompt,
-            stream=True,
-        )
-
-        for chunk in response:
-            if "response" in chunk:
-                yield chunk["response"]
+        # Stream response from Claude
+        try:
+            async for chunk in self.llm.stream_analyze_async(
+                algorithm_results=algorithm_results,
+                user_level=llm_level,
+                user_question=message,
+            ):
+                yield chunk
+        except Exception as e:
+            yield f"Error: {str(e)}"
 
     def _generate_suggestions(
         self,
         query: str,
-        docs: List[RetrievedDocument],
+        docs: List = None,
     ) -> List[str]:
         """Generate suggested follow-up questions"""
-        suggestions = [
+        return [
             "What are the clinical implications of this finding?",
             "How does this affect management?",
             "What should I look for in serial ECGs?",
+            "Can you explain this in simpler terms?",
         ]
-
-        # Add topic-specific suggestions based on retrieved docs
-        for doc in docs[:2]:
-            topic = doc.metadata.get("topic", "")
-            if topic:
-                suggestions.append(f"Tell me more about {topic}")
-
-        return suggestions[:4]
 
     # ========================================================================
     # Utility Methods
@@ -814,42 +824,58 @@ Question: {message}"""
         topic: str,
         user_level: str = "student",
     ) -> Dict[str, Any]:
-        """Get educational explanation of a topic"""
-        docs, context = self.rag.query_for_teaching(topic, top_k=5)
+        """Get educational explanation of a topic using Claude"""
 
-        level_detail = {
-            "rmp": "very simple, practical",
-            "student": "educational with fundamentals",
-            "resident": "detailed with clinical pearls",
-            "cardiologist": "expert-level with nuances",
+        # Map user level
+        level_map = {
+            "rmp": LLMUserLevel.RMP,
+            "student": LLMUserLevel.STUDENT,
+            "resident": LLMUserLevel.RESIDENT,
+            "cardiologist": LLMUserLevel.CARDIOLOGIST,
         }
+        llm_level = level_map.get(user_level, LLMUserLevel.STUDENT)
 
-        prompt = f"""Explain "{topic}" for ECG interpretation.
-Target audience: {level_detail.get(user_level, 'medical student')}
+        # Create a teaching-focused request
+        teaching_question = f"""Please provide a comprehensive educational explanation of "{topic}" for ECG interpretation.
 
-Use this knowledge:
-{context}
-
-Provide:
-1. Definition/Overview
+Include:
+1. Definition and overview
 2. Key points to remember
 3. Clinical significance
-4. Common pitfalls
+4. Common pitfalls and how to avoid them
+5. Practical tips for recognition
 
-Be accurate and cite sources when possible."""
+Make this educational and memorable."""
 
-        response = self.ollama.generate(
-            model=self.llm_model,
-            prompt=prompt,
-            options={"temperature": 0.3, "num_predict": 800},
-        )
+        try:
+            explanation = await self.llm.analyze_async(
+                algorithm_results={"topic": topic},
+                user_level=llm_level,
+                user_question=teaching_question,
+            )
+        except Exception as e:
+            explanation = f"Unable to generate explanation for {topic}. Error: {str(e)}"
 
         return {
             "topic": topic,
-            "explanation": response.get("response", ""),
-            "sources": [doc.metadata.get("source", "Unknown") for doc in docs],
-            "related_topics": [],  # Would extract from docs
+            "explanation": explanation,
+            "sources": ["Claude AI", "ECG Education"],
+            "related_topics": self._get_related_topics(topic),
         }
+
+    def _get_related_topics(self, topic: str) -> List[str]:
+        """Get related ECG topics"""
+        topic_map = {
+            "stemi": ["NSTEMI", "Coronary anatomy", "Reciprocal changes"],
+            "vt": ["SVT with aberrancy", "Brugada algorithm", "WCT differential"],
+            "wpw": ["Pre-excitation", "Accessory pathways", "AVRT"],
+            "axis": ["Left axis deviation", "Right axis deviation", "Hemiblocks"],
+            "block": ["RBBB", "LBBB", "AV blocks"],
+        }
+        for key, related in topic_map.items():
+            if key in topic.lower():
+                return related
+        return ["ECG basics", "Rhythm analysis", "Interval measurement"]
 
 
 # ========================================================================
