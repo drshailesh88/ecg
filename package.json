@@ -1,0 +1,50 @@
+{
+  "name": "ecg-guru-frontend",
+  "version": "2.0.0",
+  "description": "ECG Guru - AI-powered ECG analysis platform frontend",
+  "main": "src/ui/web/app.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:verbose": "jest --verbose"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "fake-indexeddb": "^5.0.2",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "**/tests/ui/**/*.test.js"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/ui/setup.js"
+    ],
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/src/ui/web/$1"
+    },
+    "collectCoverageFrom": [
+      "src/ui/web/**/*.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 70,
+        "lines": 70,
+        "statements": 70
+      }
+    }
+  },
+  "keywords": [
+    "ecg",
+    "cardiology",
+    "medical",
+    "ai",
+    "analysis"
+  ],
+  "author": "ECG Guru Team",
+  "license": "PROPRIETARY"
+}
