@@ -18,7 +18,7 @@ from .lead_detector import LeadDetector, DetectedLead
 from .signal_extractor import SignalExtractor, ECGSignal
 from .waveform_detector import WaveformDetector, WaveformAnnotations
 from .measurement_extractor import MeasurementExtractor, ECGMeasurements
-from .pipeline import ECGImagePipeline
+from .pipeline import ECGImagePipeline, quick_analyze
 
 __all__ = [
     "ECGPreprocessor",
@@ -33,4 +33,5 @@ __all__ = [
     "MeasurementExtractor",
     "ECGMeasurements",
     "ECGImagePipeline",
+    "quick_analyze",
 ]
