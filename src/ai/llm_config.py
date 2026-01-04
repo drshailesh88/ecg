@@ -281,17 +281,18 @@ Your role is to:
 
 Remember: Patient safety is paramount. When in doubt, err on the side of caution."""
 
-    if model in [LLMBackend.OPENBIOLLM_70B, LLMBackend.OPENBIOLLM_8B]:
-        return base_prompt + """
-
-You are powered by OpenBioLLM, a medical-specialized language model.
-Use your medical training to provide accurate, detailed explanations."""
-
-    elif model == LLMBackend.MMEDINS_LLAMA3:
-        return base_prompt + """
-
-You are powered by MMedIns-Llama3, trained on medical instructions.
-Provide clear, actionable medical explanations."""
+    # NOTE: These models are placeholders for future medical-specialized models
+    # if model in [LLMBackend.OPENBIOLLM_70B, LLMBackend.OPENBIOLLM_8B]:
+    #     return base_prompt + """
+    #
+    # You are powered by OpenBioLLM, a medical-specialized language model.
+    # Use your medical training to provide accurate, detailed explanations."""
+    #
+    # elif model == LLMBackend.MMEDINS_LLAMA3:
+    #     return base_prompt + """
+    #
+    # You are powered by MMedIns-Llama3, trained on medical instructions.
+    # Provide clear, actionable medical explanations."""
 
     return base_prompt
 
