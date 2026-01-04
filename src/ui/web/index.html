@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECG Guru - AI-Powered ECG Analysis</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                    </svg>
+                    ECG Guru
+                </h1>
+                <p class="tagline">Your Expert Electrophysiologist in Your Pocket</p>
+            </div>
+            <div class="header-controls">
+                <button id="darkModeToggle" class="icon-button" title="Toggle Dark Mode">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Left Panel: Upload and Controls -->
+            <div class="left-panel">
+                <!-- ECG Upload Section -->
+                <section class="card upload-section">
+                    <h2>Upload ECG</h2>
+
+                    <div id="dropZone" class="drop-zone">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <p class="drop-zone-text">Drag & drop ECG image here</p>
+                        <p class="drop-zone-subtext">or</p>
+                        <button id="fileSelectBtn" class="btn btn-secondary">Select File</button>
+                        <button id="cameraBtn" class="btn btn-secondary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                <circle cx="12" cy="13" r="4"/>
+                            </svg>
+                            Capture
+                        </button>
+                        <input type="file" id="fileInput" accept="image/*" hidden>
+                        <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
+                    </div>
+
+                    <div id="imagePreview" class="image-preview hidden">
+                        <img id="previewImage" alt="ECG Preview">
+                        <button id="clearImage" class="btn-clear">×</button>
+                    </div>
+                </section>
+
+                <!-- User Level Selector -->
+                <section class="card user-level-section">
+                    <h2>Your Experience Level</h2>
+                    <div class="user-level-options">
+                        <label class="radio-option">
+                            <input type="radio" name="userLevel" value="rmp">
+                            <span class="radio-label">
+                                <strong>RMP / Village Practitioner</strong>
+                                <small>Simple verdicts, red flags</small>
+                            </span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="userLevel" value="student" checked>
+                            <span class="radio-label">
+                                <strong>MBBS Student / Resident</strong>
+                                <small>Educational explanations</small>
+                            </span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="userLevel" value="resident">
+                            <span class="radio-label">
+                                <strong>MD/DM Cardiology Resident</strong>
+                                <small>Detailed analysis, differentials</small>
+                            </span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="userLevel" value="cardiologist">
+                            <span class="radio-label">
+                                <strong>Practicing Cardiologist</strong>
+                                <small>Expert-level analysis</small>
+                            </span>
+                        </label>
+                    </div>
+                </section>
+
+                <!-- Teaching Mode Toggle -->
+                <section class="card teaching-mode-section">
+                    <div class="toggle-container">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="teachingMode" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <div class="toggle-text">
+                            <strong>Teaching Mode</strong>
+                            <small>Include educational explanations</small>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Analyze Button -->
+                <button id="analyzeBtn" class="btn btn-primary" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                    Analyze ECG
+                </button>
+            </div>
+
+            <!-- Right Panel: Results and Chat -->
+            <div class="right-panel">
+                <!-- Welcome Screen -->
+                <div id="welcomeScreen" class="welcome-screen">
+                    <svg class="welcome-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                    </svg>
+                    <h2>Welcome to ECG Guru</h2>
+                    <p>Upload an ECG image to get started with AI-powered analysis</p>
+                    <div class="feature-list">
+                        <div class="feature-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            <span>Instant expert-level analysis</span>
+                        </div>
+                        <div class="feature-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            <span>Validated algorithm engine</span>
+                        </div>
+                        <div class="feature-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            <span>Interactive teaching mode</span>
+                        </div>
+                        <div class="feature-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            <span>Chat with your ECG</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis Results (Hidden initially) -->
+                <div id="resultsContainer" class="results-container hidden">
+                    <!-- Summary Card -->
+                    <section class="card summary-card">
+                        <div class="summary-header">
+                            <h2>Analysis Summary</h2>
+                            <span id="urgencyBadge" class="badge"></span>
+                        </div>
+                        <p id="summaryText" class="summary-text"></p>
+                    </section>
+
+                    <!-- Measurements -->
+                    <section class="card measurements-card">
+                        <h2>Measurements</h2>
+                        <div id="measurementsGrid" class="measurements-grid"></div>
+                    </section>
+
+                    <!-- Findings -->
+                    <section class="card findings-card">
+                        <h2>Findings</h2>
+                        <div id="findingsList" class="findings-list"></div>
+                    </section>
+
+                    <!-- Algorithm Results -->
+                    <section id="algorithmsSection" class="card algorithms-card hidden">
+                        <h2>Algorithm Analysis</h2>
+                        <div id="algorithmsList" class="algorithms-list"></div>
+                    </section>
+
+                    <!-- Chat Interface -->
+                    <section class="card chat-card">
+                        <h2>Ask Questions About This ECG</h2>
+                        <div id="chatMessages" class="chat-messages"></div>
+                        <div class="chat-input-container">
+                            <input
+                                type="text"
+                                id="chatInput"
+                                placeholder="Ask about this ECG..."
+                                class="chat-input"
+                            >
+                            <button id="sendChatBtn" class="btn-send">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="22" y1="2" x2="11" y2="13"/>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div id="suggestedQuestions" class="suggested-questions"></div>
+                    </section>
+                </div>
+
+                <!-- Loading State -->
+                <div id="loadingScreen" class="loading-screen hidden">
+                    <div class="spinner"></div>
+                    <p id="loadingText">Analyzing ECG...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

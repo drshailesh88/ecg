@@ -20,6 +20,16 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, AsyncGenerator
 
 from ..knowledge.advanced_rag import ECGKnowledgeRAG, RetrievedDocument
+from ..core.algorithms import (
+    BrugadaAlgorithm,
+    VereckeiAlgorithm,
+    BaselAlgorithm,
+    PavaAlgorithm,
+    VTSVTEnsemble,
+    STEMIDetector,
+    STEMILocalizer,
+    analyze_stemi,
+)
 
 
 class InferenceEngine:
@@ -211,20 +221,35 @@ class InferenceEngine:
         self,
         measurements: Dict,
         algorithms: List[str],
-    ) -> List[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """Run diagnostic algorithms on the measurements"""
-        results = []
+        results = {}
 
-        if "all" in algorithms or "brugada" in algorithms:
-            results.append(await self._run_brugada(measurements))
+        # STEMI analysis (always run - most critical)
+        if "all" in algorithms or "stemi" in algorithms:
+            results["stemi"] = await self._run_stemi_analysis(measurements)
 
-        if "all" in algorithms or "basel" in algorithms:
-            results.append(await self._run_basel(measurements))
+        # VT/SVT algorithms (run if wide QRS or tachycardia)
+        qrs = measurements.get("qrs_duration_ms", 0)
+        hr = measurements.get("heart_rate", 0)
 
-        if "all" in algorithms or "vereckei" in algorithms:
-            results.append(await self._run_vereckei(measurements))
+        # Only run VT/SVT algorithms if QRS is wide and there's tachycardia
+        if qrs > 120 and hr > 100:
+            if "all" in algorithms or "vt_svt_ensemble" in algorithms:
+                results["vt_svt_ensemble"] = await self._run_vt_svt_ensemble(measurements)
 
-        # Add more algorithms as implemented
+            # Individual algorithms
+            if "all" in algorithms or "brugada" in algorithms:
+                results["brugada"] = await self._run_brugada(measurements)
+
+            if "all" in algorithms or "basel" in algorithms:
+                results["basel"] = await self._run_basel(measurements)
+
+            if "all" in algorithms or "vereckei" in algorithms:
+                results["vereckei"] = await self._run_vereckei(measurements)
+
+            if "all" in algorithms or "pava" in algorithms:
+                results["pava"] = await self._run_pava(measurements)
 
         return results
 
@@ -238,20 +263,9 @@ class InferenceEngine:
         3. AV dissociation → VT
         4. Morphology criteria for VT
         """
-        # Placeholder implementation
-        return {
-            "name": "brugada",
-            "conclusion": "Unable to determine - requires signal data",
-            "confidence": 0.0,
-            "steps": [
-                {"step": 1, "criterion": "RS complex in precordials", "result": "not_evaluated"},
-                {"step": 2, "criterion": "R to S interval >100ms", "result": "not_evaluated"},
-                {"step": 3, "criterion": "AV dissociation", "result": "not_evaluated"},
-                {"step": 4, "criterion": "Morphology criteria", "result": "not_evaluated"},
-            ],
-            "supports_vt": None,
-            "supports_svt": None,
-        }
+        algorithm = BrugadaAlgorithm()
+        result = algorithm.evaluate(measurements)
+        return result.to_dict()
 
     async def _run_basel(self, measurements: Dict) -> Dict[str, Any]:
         """
@@ -259,33 +273,52 @@ class InferenceEngine:
 
         Fastest algorithm with 91-93% accuracy.
         """
-        return {
-            "name": "basel",
-            "conclusion": "Unable to determine - requires signal data",
-            "confidence": 0.0,
-            "steps": [
-                {"step": 1, "criterion": "Predominantly positive QRS in aVR", "result": "not_evaluated"},
-                {"step": 2, "criterion": "Initial R >40ms in aVR", "result": "not_evaluated"},
-                {"step": 3, "criterion": "Atypical BBB pattern", "result": "not_evaluated"},
-            ],
-            "supports_vt": None,
-            "supports_svt": None,
-        }
+        algorithm = BaselAlgorithm()
+        result = algorithm.evaluate(measurements)
+        return result.to_dict()
 
     async def _run_vereckei(self, measurements: Dict) -> Dict[str, Any]:
         """Vereckei aVR algorithm for VT vs SVT"""
+        algorithm = VereckeiAlgorithm()
+        result = algorithm.evaluate(measurements)
+        return result.to_dict()
+
+    async def _run_pava(self, measurements: Dict) -> Dict[str, Any]:
+        """Pava algorithm - R-wave peak time in Lead II"""
+        algorithm = PavaAlgorithm()
+        result = algorithm.evaluate(measurements)
+        return result.to_dict()
+
+    async def _run_vt_svt_ensemble(self, measurements: Dict) -> Dict[str, Any]:
+        """Run all VT/SVT algorithms as an ensemble"""
+        ensemble = VTSVTEnsemble()
+        result = ensemble.evaluate(measurements)
+        return result
+
+    async def _run_stemi_analysis(self, measurements: Dict) -> Dict[str, Any]:
+        """
+        STEMI detection and localization.
+
+        Returns structured STEMI analysis including:
+        - Whether STEMI criteria are met
+        - Affected territories
+        - Culprit vessel identification
+        - Urgent findings and recommendations
+        """
+        result = analyze_stemi(measurements)
+
+        # Convert STEMIResult to dictionary
         return {
-            "name": "vereckei",
-            "conclusion": "Unable to determine - requires signal data",
-            "confidence": 0.0,
-            "steps": [
-                {"step": 1, "criterion": "Initial R wave in aVR", "result": "not_evaluated"},
-                {"step": 2, "criterion": "Initial r or q >40ms", "result": "not_evaluated"},
-                {"step": 3, "criterion": "Notch on descending limb", "result": "not_evaluated"},
-                {"step": 4, "criterion": "Vi/Vt ratio", "result": "not_evaluated"},
-            ],
-            "supports_vt": None,
-            "supports_svt": None,
+            "is_stemi": result.is_stemi,
+            "territories": result.territories,
+            "culprit_vessel": result.culprit_vessel,
+            "culprit_confidence": result.culprit_confidence,
+            "segment_location": result.segment_location,
+            "st_changes": result.st_changes,
+            "urgent_findings": result.urgent_findings,
+            "recommended_actions": result.recommended_actions,
+            "differential_diagnosis": result.differential_diagnosis,
+            "additional_notes": result.additional_notes,
         }
 
     # ========================================================================
@@ -295,10 +328,65 @@ class InferenceEngine:
     async def _analyze_findings(
         self,
         measurements: Dict,
-        algorithm_results: List[Dict],
+        algorithm_results: Dict[str, Any],
     ) -> List[Dict[str, Any]]:
-        """Analyze measurements to generate findings"""
+        """Analyze measurements and algorithm results to generate findings"""
         findings = []
+
+        # PRIORITY 1: STEMI findings (most critical)
+        if "stemi" in algorithm_results:
+            stemi = algorithm_results["stemi"]
+            if stemi["is_stemi"]:
+                findings.append({
+                    "category": "ischemia",
+                    "finding": "ACUTE STEMI",
+                    "severity": "critical",
+                    "confidence": 0.98,
+                    "explanation": f"STEMI criteria met. Territory: {', '.join(stemi['territories'])}. "
+                                   f"Culprit vessel: {stemi['culprit_vessel']} ({stemi['culprit_confidence']:.0%} confidence)",
+                    "urgent_actions": stemi["urgent_findings"],
+                    "recommended_actions": stemi["recommended_actions"],
+                    "details": stemi,
+                })
+
+        # PRIORITY 2: VT/SVT differentiation (if wide QRS tachycardia)
+        if "vt_svt_ensemble" in algorithm_results:
+            ensemble = algorithm_results["vt_svt_ensemble"]
+            conclusion = ensemble.get("consensus", "Indeterminate")
+            confidence = ensemble.get("confidence", 0.0)
+            agreement = ensemble.get("agreement", {})
+
+            if conclusion == "VT":
+                findings.append({
+                    "category": "arrhythmia",
+                    "finding": "Ventricular Tachycardia (VT)",
+                    "severity": "critical",
+                    "confidence": confidence,
+                    "explanation": f"VT diagnosis based on {agreement.get('vt_count', 0)}/{agreement.get('vt_count', 0) + agreement.get('svt_count', 0)} algorithms. "
+                                   f"{ensemble.get('recommendation', '')}",
+                    "algorithm_details": ensemble["individual_results"],
+                })
+            elif conclusion == "SVT":
+                findings.append({
+                    "category": "arrhythmia",
+                    "finding": "SVT with aberrant conduction",
+                    "severity": "abnormal",
+                    "confidence": confidence,
+                    "explanation": f"SVT diagnosis based on {agreement.get('svt_count', 0)}/{agreement.get('vt_count', 0) + agreement.get('svt_count', 0)} algorithms. "
+                                   f"{ensemble.get('recommendation', '')}",
+                    "algorithm_details": ensemble["individual_results"],
+                })
+            else:
+                findings.append({
+                    "category": "arrhythmia",
+                    "finding": "Wide complex tachycardia - indeterminate",
+                    "severity": "critical",
+                    "confidence": confidence,
+                    "explanation": "Unable to definitively differentiate VT from SVT. TREAT AS VT until proven otherwise.",
+                    "algorithm_details": ensemble["individual_results"],
+                })
+
+        # PRIORITY 3: Basic rhythm and interval findings
 
         # Rate analysis
         hr = measurements.get("heart_rate", 0)
@@ -307,18 +395,20 @@ class InferenceEngine:
                 findings.append({
                     "category": "rhythm",
                     "finding": "Bradycardia",
-                    "severity": "abnormal",
+                    "severity": "abnormal" if hr >= 40 else "critical",
                     "confidence": 0.95,
                     "explanation": f"Heart rate of {hr} bpm is below normal (60-100 bpm)",
                 })
             elif hr > 100:
-                findings.append({
-                    "category": "rhythm",
-                    "finding": "Tachycardia",
-                    "severity": "abnormal",
-                    "confidence": 0.95,
-                    "explanation": f"Heart rate of {hr} bpm is above normal (60-100 bpm)",
-                })
+                # Only add if not already covered by VT/SVT analysis
+                if "vt_svt_ensemble" not in algorithm_results:
+                    findings.append({
+                        "category": "rhythm",
+                        "finding": "Tachycardia",
+                        "severity": "abnormal" if hr < 150 else "critical",
+                        "confidence": 0.95,
+                        "explanation": f"Heart rate of {hr} bpm is above normal (60-100 bpm)",
+                    })
             else:
                 findings.append({
                     "category": "rhythm",
@@ -345,20 +435,22 @@ class InferenceEngine:
                     "finding": "Short PR interval",
                     "severity": "abnormal",
                     "confidence": 0.9,
-                    "explanation": f"PR interval of {pr}ms is short. Consider pre-excitation.",
+                    "explanation": f"PR interval of {pr}ms is short. Consider pre-excitation (WPW).",
                 })
 
         # QRS duration
         qrs = measurements.get("qrs_duration_ms", 0)
         if qrs:
             if qrs > 120:
-                findings.append({
-                    "category": "conduction",
-                    "finding": "Wide QRS complex",
-                    "severity": "abnormal",
-                    "confidence": 0.9,
-                    "explanation": f"QRS duration of {qrs}ms suggests bundle branch block or ventricular origin",
-                })
+                # Only add if not already covered by VT/SVT analysis
+                if "vt_svt_ensemble" not in algorithm_results:
+                    findings.append({
+                        "category": "conduction",
+                        "finding": "Wide QRS complex",
+                        "severity": "abnormal",
+                        "confidence": 0.9,
+                        "explanation": f"QRS duration of {qrs}ms suggests bundle branch block or ventricular conduction abnormality",
+                    })
 
         # QTc
         qtc = measurements.get("qtc_ms", 0)
@@ -475,11 +567,29 @@ Be concise and clinically relevant. Cite sources when possible."""
             lines.append(f"- {f['finding']} ({f['severity']}): {f['explanation']}")
         return "\n".join(lines) if lines else "No significant findings"
 
-    def _format_algorithm_results(self, results: List[Dict]) -> str:
+    def _format_algorithm_results(self, results: Dict[str, Any]) -> str:
         """Format algorithm results for prompt"""
         lines = []
-        for r in results:
-            lines.append(f"- {r['name']}: {r['conclusion']}")
+
+        # STEMI results
+        if "stemi" in results:
+            stemi = results["stemi"]
+            if stemi["is_stemi"]:
+                lines.append(f"- STEMI: YES - {', '.join(stemi['territories'])} ({stemi['culprit_vessel']})")
+            else:
+                lines.append("- STEMI: No STEMI criteria met")
+
+        # VT/SVT ensemble
+        if "vt_svt_ensemble" in results:
+            ensemble = results["vt_svt_ensemble"]
+            lines.append(f"- VT/SVT Analysis: {ensemble.get('consensus', 'Unknown')} (confidence: {ensemble.get('confidence', 0):.0%})")
+
+        # Individual VT/SVT algorithms
+        for algo_name in ["brugada", "basel", "vereckei", "pava"]:
+            if algo_name in results:
+                algo = results[algo_name]
+                lines.append(f"- {algo.get('name', algo_name)}: {algo.get('conclusion', 'N/A')}")
+
         return "\n".join(lines) if lines else "No algorithms run"
 
     def _extract_summary(self, llm_output: str) -> str:
@@ -740,3 +850,152 @@ Be accurate and cite sources when possible."""
             "sources": [doc.metadata.get("source", "Unknown") for doc in docs],
             "related_topics": [],  # Would extract from docs
         }
+
+
+# ========================================================================
+# Test / Demo
+# ========================================================================
+
+async def test_algorithms():
+    """
+    Test algorithm integration with sample ECG measurements.
+
+    This demonstrates that the inference engine can successfully call
+    the implemented algorithms and format results.
+    """
+    print("=" * 80)
+    print("ECG Guru Inference Engine - Algorithm Integration Test")
+    print("=" * 80)
+
+    # Test Case 1: Inferior STEMI
+    print("\n" + "=" * 80)
+    print("TEST CASE 1: Inferior STEMI (RCA)")
+    print("=" * 80)
+
+    inferior_stemi_measurements = {
+        "heart_rate": 85,
+        "pr_interval_ms": 160,
+        "qrs_duration_ms": 95,
+        "qt_interval_ms": 400,
+        "qtc_ms": 420,
+        "axis_degrees": 60,
+        "rhythm": "sinus",
+        "leads": {
+            "I": {"st_elevation_mm": 0.0, "st_depression_mm": 1.5},
+            "II": {"st_elevation_mm": 2.5, "st_depression_mm": 0.0},
+            "III": {"st_elevation_mm": 3.5, "st_depression_mm": 0.0},
+            "aVR": {"st_elevation_mm": 0.0, "st_depression_mm": 0.0},
+            "aVL": {"st_elevation_mm": 0.0, "st_depression_mm": 1.0},
+            "aVF": {"st_elevation_mm": 2.8, "st_depression_mm": 0.0},
+            "V1": {"st_elevation_mm": 1.8, "st_depression_mm": 0.0},
+            "V2": {"st_elevation_mm": 0.0, "st_depression_mm": 0.0},
+            "V3": {"st_elevation_mm": 0.0, "st_depression_mm": 0.0},
+            "V4": {"st_elevation_mm": 0.0, "st_depression_mm": 0.0},
+            "V5": {"st_elevation_mm": 0.0, "st_depression_mm": 0.0},
+            "V6": {"st_elevation_mm": 0.0, "st_depression_mm": 0.0},
+        },
+        "patient_sex": "male",
+        "patient_age": 65,
+    }
+
+    engine = InferenceEngine()
+    stemi_result = await engine._run_stemi_analysis(inferior_stemi_measurements)
+
+    print(f"\nSTEMI Detected: {stemi_result['is_stemi']}")
+    print(f"Territories: {', '.join(stemi_result['territories'])}")
+    print(f"Culprit Vessel: {stemi_result['culprit_vessel']} ({stemi_result['culprit_confidence']:.0%} confidence)")
+    print(f"Segment: {stemi_result['segment_location']}")
+    print("\nUrgent Findings:")
+    for finding in stemi_result['urgent_findings']:
+        print(f"  - {finding}")
+    print("\nRecommended Actions (first 3):")
+    for action in stemi_result['recommended_actions'][:3]:
+        print(f"  - {action}")
+
+    # Test Case 2: Wide Complex Tachycardia (VT)
+    print("\n" + "=" * 80)
+    print("TEST CASE 2: Wide Complex Tachycardia (VT)")
+    print("=" * 80)
+
+    vt_measurements = {
+        "heart_rate": 180,
+        "pr_interval_ms": None,
+        "qrs_duration_ms": 160,
+        "rhythm": "wide_complex_tachycardia",
+        "age": 65,
+        "has_structural_heart_disease": True,
+        "leads": {
+            "I": {"has_rs_complex": False},
+            "II": {"has_rs_complex": False, "r_peak_time_ms": 65, "time_to_first_peak_ms": 65},
+            "III": {"has_rs_complex": False},
+            "aVR": {
+                "has_rs_complex": False,
+                "initial_r_dominant": True,
+                "initial_deflection_ms": 50,
+                "has_downstroke_notching": False,
+                "vi_vt_ratio": 0.8,
+                "time_to_first_peak_ms": 55,
+            },
+            "aVL": {"has_rs_complex": False},
+            "aVF": {"has_rs_complex": False},
+            "V1": {"has_rs_complex": False, "rs_interval_ms": None},
+            "V2": {"has_rs_complex": False, "rs_interval_ms": None},
+            "V3": {"has_rs_complex": False, "rs_interval_ms": None},
+            "V4": {"has_rs_complex": False, "rs_interval_ms": None},
+            "V5": {"has_rs_complex": False, "rs_interval_ms": None},
+            "V6": {"has_rs_complex": False, "rs_interval_ms": None},
+        },
+        "has_av_dissociation": False,
+    }
+
+    # Run individual algorithms
+    brugada = await engine._run_brugada(vt_measurements)
+    basel = await engine._run_basel(vt_measurements)
+    vereckei = await engine._run_vereckei(vt_measurements)
+    pava = await engine._run_pava(vt_measurements)
+
+    print(f"\nBrugada Algorithm: {brugada['conclusion']} (confidence: {brugada['confidence']:.0%})")
+    print(f"Basel Algorithm: {basel['conclusion']} (confidence: {basel['confidence']:.0%})")
+    print(f"Vereckei Algorithm: {vereckei['conclusion']} (confidence: {vereckei['confidence']:.0%})")
+    print(f"Pava Algorithm: {pava['conclusion']} (confidence: {pava['confidence']:.0%})")
+
+    # Run ensemble
+    ensemble = await engine._run_vt_svt_ensemble(vt_measurements)
+
+    print(f"\nENSEMBLE RESULT:")
+    print(f"Consensus: {ensemble['consensus']} (confidence: {ensemble['confidence']:.0%})")
+    print(f"Agreement: {ensemble['agreement']['agreement_level']} ({ensemble['agreement']['agreement_percentage']}%)")
+    print(f"\nRecommendation:\n{ensemble['recommendation']}")
+
+    # Test Case 3: Complete analysis with findings
+    print("\n" + "=" * 80)
+    print("TEST CASE 3: Complete Findings Analysis")
+    print("=" * 80)
+
+    algorithm_results = {
+        "stemi": stemi_result,
+    }
+
+    findings = await engine._analyze_findings(inferior_stemi_measurements, algorithm_results)
+
+    print(f"\nTotal Findings: {len(findings)}")
+    for i, finding in enumerate(findings, 1):
+        print(f"\n{i}. {finding['finding']} ({finding['severity']})")
+        print(f"   Category: {finding['category']}")
+        print(f"   Confidence: {finding['confidence']:.0%}")
+        print(f"   Explanation: {finding['explanation']}")
+
+    print("\n" + "=" * 80)
+    print("ALL TESTS COMPLETED SUCCESSFULLY")
+    print("=" * 80)
+
+
+if __name__ == "__main__":
+    """
+    Run algorithm integration tests.
+
+    Usage:
+        python -m src.api.inference
+    """
+    import asyncio
+    asyncio.run(test_algorithms())
