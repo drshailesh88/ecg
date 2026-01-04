@@ -9,20 +9,26 @@ Architecture:
 - Fallback: Templated responses from report generator
 """
 
+from __future__ import annotations
+
 import os
 import json
 import asyncio
-from typing import Optional, Dict, Any, List, AsyncGenerator
+from typing import Optional, Dict, Any, List, AsyncGenerator, TYPE_CHECKING
 from dataclasses import dataclass, field
 from enum import Enum
 import httpx
 
 # Try to import anthropic, but don't fail if not installed
+if TYPE_CHECKING:
+    import anthropic
+
 try:
     import anthropic
     ANTHROPIC_AVAILABLE = True
 except ImportError:
     ANTHROPIC_AVAILABLE = False
+    anthropic = None  # type: ignore
 
 
 class UserLevel(str, Enum):
