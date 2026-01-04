@@ -1,10 +1,16 @@
 """
 LLM Configuration for ECG Guru
 
+REALISTIC HARDWARE ASSUMPTIONS:
+- Most Indian doctors use productivity laptops (4-16GB RAM, no dedicated GPU)
+- Village RMPs may have basic laptops or phones (4GB RAM)
+- Even cardiologists rarely have gaming/workstation hardware
+- We optimize for RAM, not VRAM (most run on CPU)
+
 Supports tiered LLM selection based on:
-- Available hardware (GPU VRAM)
+- Available system RAM (not GPU VRAM)
+- Quantization level (Q4 for low RAM, Q8 for better quality)
 - Medical accuracy requirements
-- Offline capability needs
 
 IMPORTANT: The LLM does NOT make diagnoses.
 Diagnoses come from validated, coded algorithms (Brugada, Basel, etc.).
@@ -13,40 +19,51 @@ The LLM provides:
 - Teaching and education
 - Conversational interface
 - Report generation
-
-For safety-critical applications, we use medical-specific LLMs that
-understand clinical terminology and reasoning patterns better.
 """
 
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
 import subprocess
-import json
+import os
 
 
 class LLMBackend(Enum):
-    """Available LLM backends"""
+    """
+    Available LLM backends optimized for doctor hardware.
 
-    # Medical-specialized (highest quality for medical reasoning)
-    OPENBIOLLM_70B = "openbiollm:70b"  # Best medical, needs 48GB VRAM
-    OPENBIOLLM_8B = "openbiollm:8b"    # Good medical, 12GB VRAM
+    All models use quantization to run on standard laptops.
+    Format: model:quantization (Q4 = 4-bit, smallest; Q8 = 8-bit, better quality)
+    """
 
-    # Medical instruction-tuned
-    MMEDINS_LLAMA3 = "mmedins-llama3:8b"  # Multilingual medical, 12GB VRAM
+    # PRIMARY TARGETS: 4-8GB RAM laptops (most doctors)
+    QWEN_3B_Q4 = "qwen2.5:3b-instruct-q4_K_M"     # 2GB RAM - phones, 4GB laptops
+    PHI3_MINI_Q4 = "phi3:mini-4k-instruct-q4_0"   # 2GB RAM - fast, good reasoning
+    GEMMA2_2B_Q4 = "gemma2:2b-instruct-q4_K_M"    # 1.5GB RAM - smallest viable
 
-    # General purpose with medical capability
-    LLAMA3_70B = "llama3.1:70b"   # Strong reasoning, 48GB VRAM
-    LLAMA3_8B = "llama3.1:8b"     # Good balance, 12GB VRAM
+    # STANDARD: 8-12GB RAM laptops
+    QWEN_7B_Q4 = "qwen2.5:7b-instruct-q4_K_M"     # 4.5GB RAM - good balance
+    LLAMA3_8B_Q4 = "llama3.1:8b-instruct-q4_K_M"  # 5GB RAM - strong reasoning
+    MISTRAL_7B_Q4 = "mistral:7b-instruct-q4_K_M"  # 4.5GB RAM - fast
 
-    # Lightweight (works on most devices)
-    QWEN_7B = "qwen2.5:7b"        # Default, 8GB VRAM
-    QWEN_3B = "qwen2.5:3b"        # Ultra-light, 4GB VRAM
-    PHI3_MINI = "phi3:mini"       # 4GB VRAM, fast
+    # QUALITY: 12-16GB RAM (better quality when available)
+    QWEN_7B_Q8 = "qwen2.5:7b-instruct-q8_0"       # 8GB RAM - better quality
+    LLAMA3_8B_Q8 = "llama3.1:8b-instruct-q8_0"    # 9GB RAM - best small model
 
-    # Cloud options (when offline not required)
-    CLAUDE = "claude-3-sonnet"    # Via API
-    GPT4 = "gpt-4-turbo"          # Via API
+    # MEDICAL SPECIALIZED (when RAM allows)
+    # These are fine-tuned on medical data but need more resources
+    MEDITRON_7B_Q4 = "meditron:7b-q4_K_M"         # 5GB RAM - medical fine-tuned
+    MEDLLAMA_8B_Q4 = "medllama2:8b-q4_K_M"        # 5GB RAM - medical fine-tuned
+
+    # CLOUD FALLBACK (when online, for complex cases)
+    CLAUDE_HAIKU = "claude-3-haiku"               # Fast, cheap, good
+    CLAUDE_SONNET = "claude-3-sonnet"             # Better quality
+
+    # SERVER-SIDE MODELS (when running on your own server)
+    # Since you control the server hardware, you can use larger models
+    LLAMA3_70B_Q4 = "llama3.1:70b-instruct-q4_K_M"  # 40GB RAM - best quality
+    QWEN_32B_Q4 = "qwen2.5:32b-instruct-q4_K_M"    # 20GB RAM - excellent
+    MIXTRAL_8X7B_Q4 = "mixtral:8x7b-instruct-q4_K_M"  # 26GB RAM - fast MoE
 
 
 @dataclass
@@ -55,127 +72,190 @@ class LLMConfig:
 
     model: LLMBackend
     temperature: float = 0.3  # Low for medical accuracy
-    max_tokens: int = 2048
+    max_tokens: int = 1024    # Reduced for speed on low-end hardware
     system_prompt: str = ""
 
-    # Performance settings
-    num_ctx: int = 8192  # Context window
-    num_gpu: int = -1    # GPU layers (-1 = auto)
+    # Performance settings for low-end hardware
+    num_ctx: int = 4096       # Reduced context for RAM savings
+    num_thread: int = 4       # CPU threads (auto-detect better)
+    use_mmap: bool = True     # Memory-map for lower RAM usage
 
     # Medical-specific settings
-    require_citations: bool = True  # Always cite sources
-    show_confidence: bool = True    # Show confidence scores
+    require_citations: bool = True
+    show_confidence: bool = True
 
     @property
     def is_medical_specialized(self) -> bool:
         """Check if this is a medical-specialized model"""
         return self.model in [
-            LLMBackend.OPENBIOLLM_70B,
-            LLMBackend.OPENBIOLLM_8B,
-            LLMBackend.MMEDINS_LLAMA3,
+            LLMBackend.MEDITRON_7B_Q4,
+            LLMBackend.MEDLLAMA_8B_Q4,
         ]
 
     @property
-    def min_vram_gb(self) -> int:
-        """Minimum VRAM required for this model"""
-        vram_map = {
-            LLMBackend.OPENBIOLLM_70B: 48,
-            LLMBackend.LLAMA3_70B: 48,
-            LLMBackend.OPENBIOLLM_8B: 12,
-            LLMBackend.MMEDINS_LLAMA3: 12,
-            LLMBackend.LLAMA3_8B: 12,
-            LLMBackend.QWEN_7B: 8,
-            LLMBackend.QWEN_3B: 4,
-            LLMBackend.PHI3_MINI: 4,
+    def min_ram_gb(self) -> float:
+        """Minimum RAM required for this model (in GB)"""
+        ram_map = {
+            # Tiny models (4GB laptops)
+            LLMBackend.GEMMA2_2B_Q4: 2.0,
+            LLMBackend.QWEN_3B_Q4: 2.5,
+            LLMBackend.PHI3_MINI_Q4: 2.5,
+            # Standard models (8GB laptops)
+            LLMBackend.QWEN_7B_Q4: 5.0,
+            LLMBackend.LLAMA3_8B_Q4: 5.5,
+            LLMBackend.MISTRAL_7B_Q4: 5.0,
+            LLMBackend.MEDITRON_7B_Q4: 5.0,
+            LLMBackend.MEDLLAMA_8B_Q4: 5.5,
+            # Quality models (12-16GB laptops)
+            LLMBackend.QWEN_7B_Q8: 8.5,
+            LLMBackend.LLAMA3_8B_Q8: 9.5,
         }
-        return vram_map.get(self.model, 8)
+        return ram_map.get(self.model, 5.0)
+
+    @property
+    def is_quantized(self) -> bool:
+        """Check if using quantized model"""
+        return "q4" in self.model.value.lower() or "q8" in self.model.value.lower()
 
 
-def detect_gpu_vram() -> int:
-    """Detect available GPU VRAM in GB"""
+def detect_system_ram() -> float:
+    """Detect available system RAM in GB"""
     try:
+        # Linux
+        with open('/proc/meminfo', 'r') as f:
+            for line in f:
+                if 'MemTotal' in line:
+                    # Value is in KB
+                    kb = int(line.split()[1])
+                    return kb / (1024 * 1024)
+    except:
+        pass
+
+    try:
+        # macOS
         result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+            ['sysctl', '-n', 'hw.memsize'],
             capture_output=True,
             text=True
         )
         if result.returncode == 0:
-            # Get total VRAM in MB, convert to GB
-            vram_mb = int(result.stdout.strip().split('\n')[0])
-            return vram_mb // 1024
+            return int(result.stdout.strip()) / (1024 ** 3)
     except:
         pass
 
-    # Try ROCm for AMD GPUs
     try:
-        result = subprocess.run(
-            ["rocm-smi", "--showmeminfo", "vram", "--json"],
-            capture_output=True,
-            text=True
-        )
-        if result.returncode == 0:
-            data = json.loads(result.stdout)
-            # Extract VRAM (implementation depends on rocm-smi output format)
-            return 8  # Default assumption for ROCm
+        # Windows
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        c_ulonglong = ctypes.c_ulonglong
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ('dwLength', ctypes.c_ulong),
+                ('dwMemoryLoad', ctypes.c_ulong),
+                ('ullTotalPhys', c_ulonglong),
+                ('ullAvailPhys', c_ulonglong),
+                ('ullTotalPageFile', c_ulonglong),
+                ('ullAvailPageFile', c_ulonglong),
+                ('ullTotalVirtual', c_ulonglong),
+                ('ullAvailVirtual', c_ulonglong),
+                ('ullAvailExtendedVirtual', c_ulonglong),
+            ]
+        stat = MEMORYSTATUSEX()
+        stat.dwLength = ctypes.sizeof(stat)
+        kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+        return stat.ullTotalPhys / (1024 ** 3)
     except:
         pass
 
-    # No GPU detected, use CPU-friendly models
-    return 0
+    # Default assumption: 8GB (common laptop)
+    return 8.0
+
+
+def get_available_ram() -> float:
+    """Get available (free) RAM in GB"""
+    try:
+        with open('/proc/meminfo', 'r') as f:
+            for line in f:
+                if 'MemAvailable' in line:
+                    kb = int(line.split()[1])
+                    return kb / (1024 * 1024)
+    except:
+        pass
+
+    # Estimate: 60% of total RAM available
+    return detect_system_ram() * 0.6
 
 
 def get_recommended_model(
-    available_vram: int = None,
-    require_medical: bool = True,
-    require_offline: bool = True,
+    available_ram: float = None,
+    prefer_medical: bool = True,
     prefer_speed: bool = False,
+    allow_cloud: bool = False,
 ) -> LLMConfig:
     """
-    Get the recommended LLM configuration based on hardware and requirements.
+    Get the recommended LLM configuration based on actual doctor hardware.
 
     Args:
-        available_vram: GPU VRAM in GB (auto-detect if None)
-        require_medical: Prefer medical-specialized models
-        require_offline: Must work offline (via Ollama)
+        available_ram: Available RAM in GB (auto-detect if None)
+        prefer_medical: Prefer medical-specialized models when possible
         prefer_speed: Prefer faster responses over quality
+        allow_cloud: Allow cloud models as fallback
 
     Returns:
         LLMConfig with recommended settings
     """
-    if available_vram is None:
-        available_vram = detect_gpu_vram()
+    if available_ram is None:
+        available_ram = get_available_ram()
 
-    # Build preference order based on requirements
-    preferences = []
+    # Leave headroom for OS and other apps (doctors multitask)
+    usable_ram = available_ram * 0.7
 
-    if require_medical:
-        if available_vram >= 48:
-            preferences.append(LLMBackend.OPENBIOLLM_70B)
-        if available_vram >= 12:
-            preferences.append(LLMBackend.OPENBIOLLM_8B)
-            preferences.append(LLMBackend.MMEDINS_LLAMA3)
+    # Build preference order
+    selected = None
 
-    # General purpose fallbacks
-    if available_vram >= 48:
-        preferences.append(LLMBackend.LLAMA3_70B)
-    if available_vram >= 12:
-        preferences.append(LLMBackend.LLAMA3_8B)
-    if available_vram >= 8:
-        preferences.append(LLMBackend.QWEN_7B)
-    if available_vram >= 4 or prefer_speed:
-        preferences.append(LLMBackend.QWEN_3B)
-        preferences.append(LLMBackend.PHI3_MINI)
+    if usable_ram >= 8.0:
+        # 12-16GB laptop: Use quality models
+        if prefer_medical:
+            selected = LLMBackend.MEDITRON_7B_Q4
+        else:
+            selected = LLMBackend.QWEN_7B_Q8
 
-    # Default to smallest model if nothing else works
-    if not preferences:
-        preferences.append(LLMBackend.QWEN_3B)
+    elif usable_ram >= 5.0:
+        # 8-12GB laptop: Standard quantized models
+        if prefer_medical:
+            selected = LLMBackend.MEDITRON_7B_Q4
+        elif prefer_speed:
+            selected = LLMBackend.MISTRAL_7B_Q4
+        else:
+            selected = LLMBackend.QWEN_7B_Q4
 
-    selected = preferences[0]
+    elif usable_ram >= 3.0:
+        # 4-8GB laptop: Small models
+        if prefer_speed:
+            selected = LLMBackend.GEMMA2_2B_Q4
+        else:
+            selected = LLMBackend.QWEN_3B_Q4
+
+    else:
+        # <4GB: Smallest viable or cloud
+        if allow_cloud:
+            selected = LLMBackend.CLAUDE_HAIKU
+        else:
+            selected = LLMBackend.GEMMA2_2B_Q4
+
+    # Adjust context window based on RAM
+    if usable_ram < 4.0:
+        num_ctx = 2048
+    elif usable_ram < 8.0:
+        num_ctx = 4096
+    else:
+        num_ctx = 8192
 
     return LLMConfig(
         model=selected,
         temperature=0.3,
-        max_tokens=2048,
+        max_tokens=1024 if usable_ram < 8.0 else 2048,
+        num_ctx=num_ctx,
         system_prompt=get_medical_system_prompt(selected),
     )
 
@@ -321,26 +401,95 @@ Provide a detailed, accurate response based on the context above."""
         return response
 
 
-# Tier definitions for user selection
-QUALITY_TIERS = {
-    "expert": {
-        "description": "Highest quality - for cardiologists with high-end GPU (48GB+ VRAM)",
-        "models": [LLMBackend.OPENBIOLLM_70B, LLMBackend.LLAMA3_70B],
-        "min_vram": 48,
+# ============================================================================
+# Server-Side Model Selection
+# ============================================================================
+
+def get_server_model(
+    server_ram_gb: float = 32,
+    prefer_medical: bool = True,
+    prefer_speed: bool = False,
+) -> LLMConfig:
+    """
+    Get recommended model for SERVER deployment.
+
+    Since you control the server hardware, you can use larger, better models.
+    Users access via web/mobile - they don't need local resources.
+
+    Recommended server specs:
+    - Basic: 16GB RAM → 7B models (good for small clinics)
+    - Standard: 32GB RAM → 13B-32B models (most deployments)
+    - High-end: 64GB+ RAM → 70B models (hospital/enterprise)
+    """
+
+    if server_ram_gb >= 48:
+        # High-end server: Use the best
+        if prefer_medical:
+            selected = LLMBackend.MEDITRON_7B_Q4  # Would use medical 70B if available
+        else:
+            selected = LLMBackend.LLAMA3_70B_Q4
+        num_ctx = 16384
+
+    elif server_ram_gb >= 24:
+        # Standard server: 32B class models
+        selected = LLMBackend.QWEN_32B_Q4 if not prefer_speed else LLMBackend.MIXTRAL_8X7B_Q4
+        num_ctx = 8192
+
+    elif server_ram_gb >= 16:
+        # Basic server: 7B-8B models
+        if prefer_medical:
+            selected = LLMBackend.MEDITRON_7B_Q4
+        elif prefer_speed:
+            selected = LLMBackend.MISTRAL_7B_Q4
+        else:
+            selected = LLMBackend.QWEN_7B_Q8
+        num_ctx = 8192
+
+    else:
+        # Minimal server: Small models
+        selected = LLMBackend.QWEN_7B_Q4
+        num_ctx = 4096
+
+    return LLMConfig(
+        model=selected,
+        temperature=0.3,
+        max_tokens=2048,
+        num_ctx=num_ctx,
+        system_prompt=get_medical_system_prompt(selected),
+    )
+
+
+# ============================================================================
+# Deployment Tiers
+# ============================================================================
+
+DEPLOYMENT_TIERS = {
+    # For server deployments (web app backend)
+    "server_basic": {
+        "description": "Basic server - small clinic (16GB RAM)",
+        "models": [LLMBackend.QWEN_7B_Q8, LLMBackend.MEDITRON_7B_Q4],
+        "min_ram": 16,
     },
-    "standard": {
-        "description": "Excellent quality - for most users with decent GPU (12GB+ VRAM)",
-        "models": [LLMBackend.OPENBIOLLM_8B, LLMBackend.MMEDINS_LLAMA3],
-        "min_vram": 12,
+    "server_standard": {
+        "description": "Standard server - hospital (32GB RAM)",
+        "models": [LLMBackend.QWEN_32B_Q4, LLMBackend.MIXTRAL_8X7B_Q4],
+        "min_ram": 32,
     },
-    "lite": {
-        "description": "Good quality - works on most devices (8GB+ VRAM)",
-        "models": [LLMBackend.QWEN_7B, LLMBackend.LLAMA3_8B],
-        "min_vram": 8,
+    "server_enterprise": {
+        "description": "Enterprise server - large hospital (64GB+ RAM)",
+        "models": [LLMBackend.LLAMA3_70B_Q4],
+        "min_ram": 64,
     },
-    "ultra_lite": {
-        "description": "Basic quality - for low-end devices (4GB+ VRAM or CPU)",
-        "models": [LLMBackend.QWEN_3B, LLMBackend.PHI3_MINI],
-        "min_vram": 4,
+
+    # For offline mobile app (on-device inference)
+    "mobile_basic": {
+        "description": "Basic phones - village RMP (4GB RAM)",
+        "models": [LLMBackend.GEMMA2_2B_Q4],
+        "min_ram": 4,
+    },
+    "mobile_standard": {
+        "description": "Standard phones - most users (6-8GB RAM)",
+        "models": [LLMBackend.QWEN_3B_Q4, LLMBackend.PHI3_MINI_Q4],
+        "min_ram": 6,
     },
 }

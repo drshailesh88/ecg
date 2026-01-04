@@ -19,18 +19,22 @@ classifiers = [
 ]
 
 dependencies = [
-    "flet>=0.21.0",
+    # API Server
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    # Core
     "ollama>=0.1.0",
     "chromadb>=0.4.0",
+    "pydantic>=2.0.0",
+    "httpx>=0.25.0",
+    # Image processing
     "pillow>=10.0.0",
     "opencv-python-headless>=4.8.0",
     "numpy>=1.24.0",
-    "pydantic>=2.0.0",
-    "httpx>=0.25.0",
-    # Advanced RAG dependencies
-    "sentence-transformers>=2.2.0",  # PubMedBERT embeddings & cross-encoder reranking
-    "rank-bm25>=0.2.2",  # BM25 sparse retrieval for hybrid search
-    # PDF processing for textbook extraction
+    # Advanced RAG
+    "sentence-transformers>=2.2.0",  # PubMedBERT embeddings & cross-encoder
+    "rank-bm25>=0.2.2",  # BM25 sparse retrieval
+    # PDF processing
     "pymupdf>=1.23.0",  # PyMuPDF for PDF parsing
     "beautifulsoup4>=4.12.0",  # HTML parsing for LITFL scraper
 ]
@@ -44,9 +48,13 @@ dev = [
     "ruff>=0.1.0",
     "pre-commit>=3.4.0",
 ]
+# Flet UI (optional - for desktop/mobile native app)
+ui = [
+    "flet>=0.21.0",
+]
 
 [project.scripts]
-ecg-guru = "ecg_guru.main:main"
+ecg-guru-server = "src.api.server:main"
 
 [build-system]
 requires = ["hatchling"]
